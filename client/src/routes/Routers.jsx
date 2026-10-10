@@ -20,11 +20,13 @@ import OrderDetails from "../pages/user/Orders/OrderDetails";
 import AdminOrders from "../pages/Admin/AdminOrders";
 import UpdateOrders from "../pages/Admin/UpdateOrders";
 import DeleteAllOrder from "../pages/DeleteAllOrder.jsx";
+import DataPassDemo from "../pages/DataPassDemo";
 
 const Routers = () => {
     return (
         <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/data-demo" element={<DataPassDemo />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
