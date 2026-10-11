@@ -1,23 +1,32 @@
 import productModel from "../../models/productModel.js";
+import mongoose from "mongoose";
 
 const findProduct = async (req, res) => {
     try {
         const productId = req.params.id;
 
-        const response = await productModel.findById(productId);
-        // if no response -? product don't exist
-        !response &&
-            res.status(401).send({
+        if (!mongoose.isValidObjectId(productId)) {
+            return res.status(404).send({
                 success: false,
                 errorType: "productNotFound",
                 message: "Product Not Found",
             });
-        response &&
-            res.status(201).send({
-                success: true,
-                message: "Product Fetched Successfully",
-                product: response,
+        }
+
+        const response = await productModel.findById(productId);
+        if (!response) {
+            return res.status(404).send({
+                success: false,
+                errorType: "productNotFound",
+                message: "Product Not Found",
             });
+        }
+
+        return res.status(201).send({
+            success: true,
+            message: "Product Fetched Successfully",
+            product: response,
+        });
     } catch (error) {
         console.log("Find Product Error: " + error);
         res.status(500).send({

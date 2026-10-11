@@ -1,7 +1,8 @@
 import { BsSearch } from "react-icons/bs";
 import debounce from "lodash.debounce";
 import { useState } from "react";
-import axios from "axios";
+import { Link } from "react-router-dom";
+import { fetchCatalog } from "../../utils/productApi";
 
 const SearchBar = () => {
     const [query, setQuery] = useState("");
@@ -10,12 +11,8 @@ const SearchBar = () => {
 
     const handleSearch = async (query) => {
         try {
-            const products = await axios.get(
-                `${
-                    import.meta.env.VITE_SERVER_URL
-                }/api/v1/product/search/${query}`
-            );
-            setResults(products.data.slice(0, 6));
+            const catalog = await fetchCatalog({ query });
+            setResults(catalog.products.slice(0, 6));
             setOpen(true);
         } catch (error) {
             console.error("Error searching for products:", error);
@@ -56,7 +53,7 @@ const SearchBar = () => {
             >
                 <form
                     action="/search"
-                    method=""
+                    method="get"
                     className="bg-[#f0f5ff] relative w-[100%] rounded-md"
                 >
                     <div className="flex items-center h-[40px] ">
@@ -70,6 +67,7 @@ const SearchBar = () => {
                         <div className="w-[100%]">
                             <input
                                 type="text"
+                                name="q"
                                 title="Search for Products, Brands and More"
                                 placeholder="Search for Products, Brands and More"
                                 autoComplete="off"
@@ -83,25 +81,30 @@ const SearchBar = () => {
                 {results.length > 0 && open && (
                     <ul className="absolute top-[40px] left-0 right-0 pb-2 z-50 w-full bg-white shadow-lg rounded-b-md">
                         {results.map((product) => (
-                            <li key={product?._id}>
-                                <a
-                                    href={`/product/${product._id}`}
+                            <li key={product.id || product._id}>
+                                <Link
+                                    to={`/product/${product.id || product._id}${
+                                        product.source
+                                            ? `?source=${product.source}`
+                                            : ""
+                                    }`}
                                     className="px-5 py-4 h-[50px] hover:bg-[#f0f5ff] flex gap-5"
+                                    onClick={() => setOpen(false)}
                                 >
                                     <img
-                                        src={product?.images[0].url}
-                                        alt="product"
-                                        className="w-5 h-5"
+                                        src={product.image || product.images?.[0]?.url}
+                                        alt={product.title || product.name || "Product"}
+                                        className="h-8 w-8 object-contain"
                                     />
                                     <span>
-                                        {product?.name?.length > 40
-                                            ? `${product?.name?.substring(
+                                        {(product.title || product.name || "Product").length > 40
+                                            ? `${(product.title || product.name).substring(
                                                   0,
                                                   40
                                               )}...`
-                                            : product?.name}
+                                            : product.title || product.name || "Product"}
                                     </span>
-                                </a>
+                                </Link>
                             </li>
                         ))}
                     </ul>

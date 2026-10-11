@@ -12,31 +12,50 @@ import { useAuth } from "../../context/auth";
 
 const Product = ({
     _id,
+    id,
+    source,
     images,
+    image,
     name,
+    title,
+    category,
     ratings,
     numOfReviews,
+    rating,
     price,
     discountPrice,
     wishlistItems,
     setWishlistItems,
 }) => {
     const { auth, isAdmin } = useAuth();
+    const productId = _id || id;
+    const productName = name || title || "Product";
+    const imageUrl = images?.[0]?.url || image;
+    const ratingValue = Number(
+        typeof ratings === "number" ? ratings : rating?.rate || 0
+    );
+    const reviewCount = numOfReviews ?? rating?.count ?? 0;
+    const currentPrice = discountPrice ?? price ?? 0;
+    const originalPrice = price ?? currentPrice;
+    const canUpdateWishlist = Boolean(_id);
 
     //check if item is present in user wishlist or not
     const itemInWishlist = wishlistItems?.some((itemId) => {
-        return itemId === _id;
+        return itemId === productId;
     });
 
     // Optimistic UI update
     const updateWishlistUI = (add) => {
         setWishlistItems((prev) =>
-            add ? [...prev, _id] : prev.filter((item) => item !== _id)
+            add
+                ? [...prev, productId]
+                : prev.filter((item) => item !== productId)
         );
     };
 
     // add to wishlist function
     const addToWishlistHandler = async () => {
+        if (!canUpdateWishlist) return;
         const type = itemInWishlist ? "remove" : "add";
         try {
             // Update the UI before the API call
@@ -73,56 +92,73 @@ const Product = ({
             <ScrollToTopOnRouteChange />
             <div className="relative">
                 {/* <!-- wishlist badge --> */}
-                <span
+                <button
+                    type="button"
                     onClick={addToWishlistHandler}
+                    disabled={!canUpdateWishlist || isAdmin}
+                    aria-label={itemInWishlist ? "Remove from wishlist" : "Add to wishlist"}
                     className={`${
                         itemInWishlist
                             ? "text-red-500"
                             : "hover:text-red-500 text-gray-300"
                     }
-                    ${isAdmin ? "hidden" : ""}
+                    ${isAdmin || !canUpdateWishlist ? "hidden" : ""}
                     absolute z-10  top-2 right-3 cursor-pointer`}
                 >
                     <FavoriteIcon sx={{ fontSize: "20px" }} />
-                </span>
+                </button>
                 {/* <!-- wishlist badge --> */}
-                <div className="flex flex-col items-center gap-2 w-full px-4 py-6 relative hover:shadow-lg rounded-sm">
+                <Link
+                    to={
+                        productId
+                            ? `/product/${productId}${
+                                  source ? `?source=${source}` : ""
+                              }`
+                            : "/products"
+                    }
+                    className="flex flex-col items-center gap-2 w-full px-4 py-6 relative hover:shadow-lg rounded-sm"
+                >
                     {/* <!-- image & product title --> */}
-                    <Link
-                        to={`/product/${_id}`}
-                        className="flex flex-col items-center w-full text-center group"
-                    >
+                    <div className="flex flex-col items-center w-full text-center group">
                         <div className="w-44 h-48">
                             <img
                                 draggable="false"
                                 className="w-full h-full object-contain"
-                                src={images && images[0]?.url}
-                                alt={name}
+                                src={imageUrl}
+                                alt={productName}
+                                onError={(event) => {
+                                    event.currentTarget.style.visibility = "hidden";
+                                }}
                             />
                         </div>
-                    </Link>
+                    </div>
                     {/* <!-- image & product title --> */}
 
                     {/* <!-- product description --> */}
                     <div className="flex flex-col gap-2 items-start w-full">
+                        {category && (
+                            <span className="text-xs capitalize text-gray-500">
+                                {category}
+                            </span>
+                        )}
                         <h2 className="text-sm leading-6 font-[500] mt-4 group-hover:text-primary-blue text-left">
-                            {name.length > 25
-                                ? `${name.substring(0, 25)}...`
-                                : name}
+                            {productName.length > 55
+                                ? `${productName.substring(0, 55)}...`
+                                : productName}
                         </h2>
                         {/* <!-- rating badge --> */}
                         <span className="text-sm text-gray-500 font-medium flex gap-2 items-start justify-between">
                             <span className="text-xs px-1.5 py-0.5 bg-[#22ba20] rounded-sm text-white flex items-center gap-0.5">
-                                {ratings.toFixed(1)}
+                                {ratingValue.toFixed(1)}
                                 <StarIcon sx={{ fontSize: "14px" }} />
                             </span>
-                            <span>({numOfReviews})</span>
+                            <span>({reviewCount})</span>
                             <span>
                                 <img
                                     draggable="false"
                                     className="w-[60px] h-[20px] ml-4 object-contain"
                                     src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/fa_62673a.png"
-                                    alt={name}
+                                    alt={productName}
                                 />
                             </span>
                         </span>
@@ -130,18 +166,22 @@ const Product = ({
 
                         {/* <!-- price container --> */}
                         <div className="flex items-center gap-1.5 text-md font-medium">
-                            <span>₹{discountPrice.toLocaleString()}</span>
-                            <span className="text-gray-500 line-through text-xs">
-                                ₹{price.toLocaleString()}
-                            </span>
-                            <span className="text-xs text-primary-green">
-                                {getDiscount(price, discountPrice)}%&nbsp;off
-                            </span>
+                            <span>₹{currentPrice.toLocaleString()}</span>
+                            {originalPrice > currentPrice && (
+                                <>
+                                    <span className="text-gray-500 line-through text-xs">
+                                        ₹{originalPrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-xs text-primary-green">
+                                        {getDiscount(originalPrice, currentPrice)}%&nbsp;off
+                                    </span>
+                                </>
+                            )}
                         </div>
                         {/* <!-- price container --> */}
                     </div>
                     {/* <!-- product description --> */}
-                </div>
+                </Link>
             </div>
         </>
     );

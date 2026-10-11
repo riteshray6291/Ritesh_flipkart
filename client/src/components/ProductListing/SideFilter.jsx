@@ -7,12 +7,12 @@ import Slider from "@mui/material/Slider";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import StarIcon from "@mui/icons-material/Star";
-import { categories } from "../../utils/constants";
 import { useState, useRef, useEffect } from "react";
 
 const SideFilter = ({
     price,
     category,
+    categories,
     ratings,
     setPrice,
     setCategory,
@@ -120,17 +120,14 @@ const SideFilter = ({
                                         name="category-radio-buttons"
                                         value={category}
                                     >
-                                        {categories.map((el, i) => (
+                                        {categories.map((el) => (
                                             <FormControlLabel
-                                                value={el}
-                                                key={i}
+                                                value={el.id}
+                                                key={el.id || "all"}
                                                 control={<Radio size="small" />}
                                                 label={
-                                                    <span
-                                                        className="text-sm"
-                                                        key={i}
-                                                    >
-                                                        {el}
+                                                    <span className="text-sm">
+                                                        {el.name}
                                                     </span>
                                                 }
                                             />

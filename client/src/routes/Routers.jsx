@@ -38,7 +38,7 @@ const Routers = () => {
                 <Route path="confirm" element={<OrderSuccess />} />
                 <Route path="failed" element={<OrderFailed />} />
             </Route>
-            <Route path="product/:productId" element={<ProductPage />} />
+            <Route path="/product/:productId" element={<ProductPage />} />
             <Route path="/user" element={<PrivateRoute />}>
                 <Route path="dashboard/*" element={<Dashboard />} />
                 <Route path="orders" element={<Orders />} />

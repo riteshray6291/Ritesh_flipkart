@@ -1,68 +1,63 @@
-import mobiles from "../../assets/images/Categories/phone.png";
 import fashion from "../../assets/images/Categories/fashion.png";
 import electronics from "../../assets/images/Categories/electronics.png";
 import home from "../../assets/images/Categories/home.png";
-import travel from "../../assets/images/Categories/travel.png";
-import appliances from "../../assets/images/Categories/appliances.png";
-import furniture from "../../assets/images/Categories/furniture.png";
 import beauty from "../../assets/images/Categories/beauty.png";
-import grocery from "../../assets/images/Categories/grocery.png";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { fetchProductCategories } from "../../utils/productApi";
 
-const catNav = [
-    {
-        name: "Mobiles",
-        icon: mobiles,
-    },
-    {
-        name: "Fashion",
-        icon: fashion,
-    },
-    {
-        name: "Electronics",
-        icon: electronics,
-    },
-    {
-        name: "Home",
-        icon: home,
-    },
-    {
-        name: "Travel",
-        icon: travel,
-    },
-    {
-        name: "Appliances",
-        icon: appliances,
-    },
-    {
-        name: "Furniture",
-        icon: furniture,
-    },
-    {
-        name: "Beauty,Toys & more",
-        icon: beauty,
-    },
-    {
-        name: "Grocery",
-        icon: grocery,
-    },
-];
+const categoryIcons = {
+    Mobiles: electronics,
+    Electronics: electronics,
+    Men: fashion,
+    Women: fashion,
+    Fashion: fashion,
+    "Home and Furniture": home,
+    Appliances: home,
+    Jewelry: beauty,
+    "Beauty and More": beauty,
+};
 
 const Categories = () => {
+    const [catNav, setCatNav] = useState([
+        { id: "", name: "All Products" },
+    ]);
+
+    useEffect(() => {
+        let active = true;
+        fetchProductCategories()
+            .then((options) => {
+                if (active) setCatNav(options);
+            })
+            .catch((error) => {
+                console.error("Error fetching product categories:", error);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
     return (
         <section className="hidden sm:block bg-white p-0 min-w-full px-12 shadow overflow-hidden">
             <div className="flex items-center justify-between group">
-                {catNav.map((item, i) => (
+                {catNav.slice(0, 9).map((item) => (
                     <Link
-                        to={`/products?category=${item.name}`}
+                        to={
+                            item.id
+                                ? `/products?category=${encodeURIComponent(item.id)}`
+                                : "/products"
+                        }
                         className="flex flex-col gap-1 items-center p-2"
-                        key={i}
+                        key={item.id || "all"}
                     >
                         <div className="h-16 w-16 ">
                             <img
                                 draggable="false"
                                 className="h-full w-full object-contain"
-                                src={item.icon}
+                                src={
+                                    categoryIcons[item.name] ||
+                                    electronics
+                                }
                                 alt={item.name}
                             />
                         </div>

@@ -1,13 +1,9 @@
 // Categories Used In Entire App
 export const categories = [
-    "Mobiles",
     "Electronics",
-    "Fashion",
-    "Appliances",
-    "Home",
-    "Furniture",
-    "Grocery",
-    "Beauty, Toys and More",
+    "Men",
+    "Women",
+    "Jewelry",
 ];
 
 // Product Sliders Offers

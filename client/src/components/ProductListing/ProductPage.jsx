@@ -1,10 +1,8 @@
 /* eslint-disable no-unused-vars */
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { Link, useNavigate, useParams } from "react-router-dom";
-import Slider from "react-slick";
-import { NextBtn, PreviousBtn } from "../../pages/Home/Banner/Banner.jsx";
-import ProductSlider from "../../pages/Home/ProductsListing/ProductSlider.jsx";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import ProductCard from "./Product.jsx";
 import Spinner from "../../components/Spinner";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import FlashOnIcon from "@mui/icons-material/FlashOn";
@@ -24,8 +22,7 @@ import { getDeliveryDate, getDiscount } from "../../utils/functions";
 import MinCategory from "../../components/MinCategory";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
-import { fashionProducts } from "../../utils/fashion";
-import { electronicProducts } from "../../utils/electronics";
+import { fetchCatalog, fetchProductById } from "../../utils/productApi";
 import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
 import { useCart } from "../../context/cart";
 import SeoData from "../../SEO/SeoData";
@@ -41,22 +38,17 @@ const ProductDetails = () => {
     const [comment, setComment] = useState("");
     const [wishlistItems, setWishlistItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [product, setProduct] = useState({});
-
-    const settings = {
-        autoplay: true,
-        autoplaySpeed: 3000,
-        dots: true,
-        infinite: true,
-        speed: 500,
-        slidesToShow: 1,
-        slidesToScroll: 1,
-        prevArrow: <PreviousBtn />,
-        nextArrow: <NextBtn />,
-    };
+    const [loadError, setLoadError] = useState("");
+    const [retryCount, setRetryCount] = useState(0);
+    const [product, setProduct] = useState(null);
+    const [activeImage, setActiveImage] = useState(0);
+    const [imageError, setImageError] = useState(false);
+    const [quantity, setQuantity] = useState(1);
+    const [recommendedProducts, setRecommendedProducts] = useState([]);
 
     const { productId } = useParams();
-    // console.log(productId);
+    const [searchParams] = useSearchParams();
+    const productSource = searchParams.get("source") || "";
 
     const reviewSubmitHandler = () => {
         if (rating === 0 || !comment.trim()) {
@@ -76,17 +68,20 @@ const ProductDetails = () => {
     };
 
     const addToCartHandler = () => {
+        if (!product?._id || product.source === "affiliate" || product.source === "demo") {
+            return;
+        }
         const item = {
             productId: product._id,
             name: product.name,
             stock: product.stock,
-            image: product.images[0].url,
-            brandName: product.brand.name,
+            image: product.images?.[0]?.url || "",
+            brandName: product.brand?.name || "Flipkart",
             price: product.price,
             discountPrice: product.discountPrice,
             seller: product.seller,
         };
-        addItems(item, 1);
+        addItems(item, quantity);
     };
 
     const handleDialogClose = () => {
@@ -126,45 +121,147 @@ const ProductDetails = () => {
         auth.token && !isAdmin && fetchWishlistItems();
     }, [isContextLoading, auth.token, auth, isAdmin]);
 
-    //fetch product details
+    // Fetch product details and keep the page mounted for API errors.
     useEffect(() => {
+        let active = true;
         const fetchProduct = async () => {
+            setLoading(true);
+            setLoadError("");
+            setProduct(null);
             try {
-                const res = await axios.get(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
-                    }/api/v1/product/${productId}`
-                );
-                // console.log(res.data.product);
-                res.status === 201 && setProduct(res.data.product);
-                setLoading(false);
-            } catch (error) {
-                console.error("Error:", error);
-                setLoading(false);
-                // product not found
-                error.response?.status === 404 &&
-                    toast.error("Product Not Found!", {
-                        style: {
-                            top: "40px",
-                        },
-                    });
-
-                //server error
-                error.response?.status === 500 &&
-                    toast.error(
-                        "Something went wrong! Please try after sometime.",
-                        {
-                            style: {
-                                top: "40px",
+                const apiProduct = await fetchProductById(productId, productSource);
+                if (active) {
+                    if (
+                        apiProduct?.source === "affiliate" &&
+                        String(apiProduct.id) === productId
+                    ) {
+                        const specifications = (apiProduct.specificationList || [])
+                            .flatMap((group) =>
+                                (group.values || []).map((item) => ({
+                                    title: item.key || group.key || "Specification",
+                                    description: Array.isArray(item.value)
+                                        ? item.value.join(", ")
+                                        : String(item.value || ""),
+                                }))
+                            )
+                            .filter((item) => item.description);
+                        setProduct({
+                            ...apiProduct,
+                            name: apiProduct.title,
+                            images: [{ url: apiProduct.image }],
+                            ratings: 0,
+                            numOfReviews: 0,
+                            price: apiProduct.mrp,
+                            discountPrice: apiProduct.price,
+                            stock: apiProduct.inStock ? 1 : 0,
+                            brand: {
+                                name: apiProduct.brand || "Flipkart",
+                                logo: { url: apiProduct.image },
                             },
-                        }
+                            warranty: 0,
+                            highlights: apiProduct.keySpecs || [],
+                            specifications: [
+                                {
+                                    title: "Category",
+                                    description: apiProduct.category,
+                                },
+                                ...specifications,
+                            ],
+                            reviews: [],
+                            seller: apiProduct.seller?.sellerName || "Flipkart",
+                        });
+                        setActiveImage(0);
+                        setImageError(false);
+                    } else if (
+                        Number.isInteger(apiProduct?.id) &&
+                        apiProduct.id === Number(productId)
+                    ) {
+                        setProduct({
+                            ...apiProduct,
+                            _id: String(apiProduct.id),
+                            name: apiProduct.title,
+                            images: [{ url: apiProduct.image }],
+                            ratings: apiProduct.rating?.rate || 0,
+                            numOfReviews: apiProduct.rating?.count || 0,
+                            discountPrice: apiProduct.price,
+                            stock: 99,
+                            brand: {
+                                name: apiProduct.category,
+                                logo: { url: apiProduct.image },
+                            },
+                            warranty: 0,
+                            highlights: [],
+                            specifications: [
+                                {
+                                    title: "Category",
+                                    description: apiProduct.category,
+                                },
+                            ],
+                            reviews: [],
+                            seller: "Demo catalog",
+                        });
+                        setActiveImage(0);
+                        setImageError(false);
+                    } else if (apiProduct?._id) {
+                        setProduct(apiProduct);
+                        setActiveImage(0);
+                        setImageError(false);
+                    } else {
+                        setLoadError("not-found");
+                    }
+                }
+            } catch (error) {
+                if (active) {
+                    setLoadError(
+                            error.response?.status === 404
+                                ? "not-found"
+                                : error.response?.data?.message || "failed"
                     );
+                }
+            } finally {
+                if (active) setLoading(false);
             }
         };
         fetchProduct();
-    }, [productId]);
+        return () => {
+            active = false;
+        };
+    }, [productId, productSource, retryCount]);
 
-    let itemInWishlist = wishlistItems?.find((id) => id === productId);
+    useEffect(() => {
+        if (!product?._id) return;
+        if (product.source !== "demo" || !Number.isInteger(product.id)) {
+            setRecommendedProducts([]);
+            return;
+        }
+
+        let active = true;
+        fetchCatalog({ category: product.category })
+            .then((catalog) => {
+                if (active && Array.isArray(catalog.products)) {
+                    setRecommendedProducts(
+                        catalog.products
+                            .filter(
+                                (item) =>
+                                    item.id !== Number(product._id) &&
+                                    item.category === product.category
+                            )
+                            .slice(0, 8)
+                    );
+                }
+            })
+            .catch(() => {
+                if (active) setRecommendedProducts([]);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [product?.id, product?._id, product?.category, product?.source]);
+
+    const itemInWishlist = wishlistItems?.some(
+        (id) => id === product?._id
+    );
     // Optimistic UI update
     const updateWishlistUI = (add) => {
         setWishlistItems((prev) =>
@@ -175,6 +272,7 @@ const ProductDetails = () => {
     };
 
     const addToWishlistHandler = async () => {
+        if (!product?._id) return;
         let type = itemInWishlist ? "remove" : "add";
         try {
             // Update the UI before the API call
@@ -221,6 +319,34 @@ const ProductDetails = () => {
         <>
             {loading ? (
                 <Spinner />
+            ) : loadError || !product ? (
+                <main className="min-h-[55vh] flex flex-col items-center justify-center gap-4 bg-white px-5 text-center">
+                    <h1 className="text-2xl font-medium">
+                        {loadError === "not-found"
+                            ? "Product not found"
+                            : "We couldn't load this product"}
+                    </h1>
+                    <p className="max-w-md text-gray-600">
+                        {loadError === "not-found"
+                            ? "This product may have been removed or the link may be incorrect."
+                            : "Please check your connection and try again."}
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setRetryCount((count) => count + 1)}
+                            className="rounded-sm bg-[#2874f0] px-5 py-2.5 font-medium text-white"
+                        >
+                            Try again
+                        </button>
+                        <Link
+                            to="/products"
+                            className="rounded-sm border px-5 py-2.5 font-medium"
+                        >
+                            Browse products
+                        </Link>
+                    </div>
+                </main>
             ) : (
                 <>
                     <SeoData title={product?.name} />
@@ -234,36 +360,56 @@ const ProductDetails = () => {
                                 {/* <!-- imgBox --> */}
                                 <div className="flex flex-col gap-3 m-3 ">
                                     <div className="w-full lg:w-[450px] h-full pb-6 border relative">
-                                        <Slider {...settings}>
-                                            {product?.images.length > 1 ? (
-                                                product?.images?.map(
-                                                    (item, i) => (
+                                        {product.images?.[activeImage]?.url &&
+                                        !imageError ? (
+                                            <img
+                                                draggable="false"
+                                                className="h-96 w-full object-contain"
+                                                src={product.images[activeImage].url}
+                                                alt={product.name}
+                                                onError={() => setImageError(true)}
+                                            />
+                                        ) : (
+                                            <div className="flex h-96 w-full items-center justify-center bg-gray-50 text-sm text-gray-500">
+                                                Product image unavailable
+                                            </div>
+                                        )}
+                                        {product.images?.length > 1 && (
+                                            <div className="flex justify-center gap-2 overflow-x-auto px-3 pb-2">
+                                                {product.images.map((image, index) => (
+                                                    <button
+                                                        key={`${image.url}-${index}`}
+                                                        type="button"
+                                                        aria-label={`Show product image ${index + 1}`}
+                                                        aria-pressed={activeImage === index}
+                                                        onClick={() => {
+                                                            setActiveImage(index);
+                                                            setImageError(false);
+                                                        }}
+                                                        className={`h-14 w-14 shrink-0 border p-1 ${activeImage === index ? "border-[#2874f0]" : "border-gray-200"}`}
+                                                    >
                                                         <img
-                                                            draggable="false"
-                                                            className="w-full h-96 object-contain"
-                                                            src={item.url}
-                                                            alt={product.name}
-                                                            key={i}
+                                                            src={image.url}
+                                                            alt=""
+                                                            className="h-full w-full object-contain"
+                                                            onError={(event) => {
+                                                                event.currentTarget.style.visibility = "hidden";
+                                                            }}
                                                         />
-                                                    )
-                                                )
-                                            ) : (
-                                                <img
-                                                    draggable="false"
-                                                    className="w-full h-96 object-contain"
-                                                    src={
-                                                        product?.images[0]?.url
-                                                    }
-                                                    alt={product?.name}
-                                                />
-                                            )}
-                                        </Slider>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div
                                             className={`absolute top-4 right-4 shadow-lg bg-white w-9 h-9 border flex items-center justify-center rounded-full ${
-                                                isAdmin ? "hidden" : ""
+                                                isAdmin || !/^[a-f\d]{24}$/i.test(product._id)
+                                                    ? "hidden"
+                                                    : ""
                                             } `}
                                         >
-                                            <span
+                                                <button
+                                                    type="button"
+                                                    aria-label={itemInWishlist ? "Remove from wishlist" : "Add to wishlist"}
                                                 onClick={addToWishlistHandler}
                                                 className={`${
                                                     itemInWishlist
@@ -274,7 +420,34 @@ const ProductDetails = () => {
                                                 <FavoriteIcon
                                                     sx={{ fontSize: "18px" }}
                                                 />
-                                            </span>
+                                                </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-3 px-1 text-sm">
+                                        <span className="font-medium">Quantity</span>
+                                        <div className="flex items-center border">
+                                            <button
+                                                type="button"
+                                                aria-label="Decrease quantity"
+                                                disabled={quantity <= 1}
+                                                onClick={() => setQuantity((value) => Math.max(1, value - 1))}
+                                                className="h-9 w-9 disabled:text-gray-300"
+                                            >
+                                                -
+                                            </button>
+                                            <output className="min-w-10 text-center" aria-live="polite">
+                                                {quantity}
+                                            </output>
+                                            <button
+                                                type="button"
+                                                aria-label="Increase quantity"
+                                                disabled={quantity >= product.stock}
+                                                onClick={() => setQuantity((value) => Math.min(product.stock, value + 1))}
+                                                className="h-9 w-9 disabled:text-gray-300"
+                                            >
+                                                +
+                                            </button>
                                         </div>
                                     </div>
 
@@ -287,7 +460,7 @@ const ProductDetails = () => {
                                                         ? goToCart
                                                         : addToCartHandler
                                                 }
-                                                disabled={isAdmin}
+                                                disabled={isAdmin || product.stock < 1}
                                                 className="disabled:cursor-not-allowed p-2 sm:p-4 w-1/2 flex items-center justify-center gap-2 text-white bg-[#ff9f00] rounded-sm shadow hover:shadow-lg"
                                             >
                                                 <ShoppingCartIcon />
@@ -326,6 +499,9 @@ const ProductDetails = () => {
                                     <h2 className="text-lg sm:text-xl">
                                         {product?.name}
                                     </h2>
+                                    <p className="text-sm capitalize text-gray-500">
+                                        {product?.category}
+                                    </p>
                                     {/* <!-- rating badge --> */}
                                     <span className="text-md text-gray-500 font-medium flex gap-2 items-center">
                                         <span className="text-xs px-1.5 py-0.5 bg-primaryGreen rounded-sm text-white flex items-center gap-0.5">
@@ -348,25 +524,31 @@ const ProductDetails = () => {
 
                                     {/* <!-- price desc --> */}
                                     <div className="flex flex-col text-3xl">
-                                        <span className="text-primaryGreen text-sm font-medium">
-                                            Special Price
-                                        </span>
+                                        {product.price > product.discountPrice && (
+                                            <span className="text-primaryGreen text-sm font-medium">
+                                                Special Price
+                                            </span>
+                                        )}
                                         <div className="flex items-baseline gap-2 text-3xl font-medium">
                                             <span className="text-gray-800">
                                                 ₹
                                                 {product?.discountPrice?.toLocaleString()}
                                             </span>
-                                            <span className="text-base text-gray-500 line-through">
-                                                ₹
-                                                {product?.price?.toLocaleString()}
-                                            </span>
-                                            <span className="text-base text-primaryGreen">
-                                                {getDiscount(
-                                                    product?.price,
-                                                    product?.discountPrice
-                                                )}
-                                                %&nbsp;off
-                                            </span>
+                                            {product.price > product.discountPrice && (
+                                                <>
+                                                    <span className="text-base text-gray-500 line-through">
+                                                        ₹
+                                                        {product?.price?.toLocaleString()}
+                                                    </span>
+                                                    <span className="text-base text-primaryGreen">
+                                                        {getDiscount(
+                                                            product?.price,
+                                                            product?.discountPrice
+                                                        )}
+                                                        %&nbsp;off
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                     {product?.stock <= 10 &&
@@ -426,7 +608,7 @@ const ProductDetails = () => {
                                         <img
                                             draggable="false"
                                             className="w-20 h-8 p-0.5 border object-contain"
-                                            src={product.brand?.logo.url}
+                                            src={product.brand?.logo?.url}
                                             alt={product?.brand?.name}
                                         />
                                         <span>
@@ -730,15 +912,23 @@ const ProductDetails = () => {
                         {/* <!-- product image & description container --> */}
 
                         {/* Sliders */}
-                        <div className="flex flex-col gap-3 mt-6">
-                            <ProductSlider
-                                title={"Recommendation"}
-                                products={[
-                                    ...fashionProducts,
-                                    ...electronicProducts,
-                                ]}
-                            />
-                        </div>
+                        {recommendedProducts.length > 0 && (
+                            <section className="mt-6 bg-white px-4 py-5 sm:px-6">
+                                <h2 className="mb-3 text-xl font-medium">
+                                    Similar products
+                                </h2>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                    {recommendedProducts.map((recommended) => (
+                                        <ProductCard
+                                            key={recommended.id}
+                                            {...recommended}
+                                            wishlistItems={wishlistItems}
+                                            setWishlistItems={setWishlistItems}
+                                        />
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     </main>
                 </>
             )}

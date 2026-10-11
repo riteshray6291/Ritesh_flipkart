@@ -10,24 +10,28 @@ import axios from "axios";
 import SeoData from "../../SEO/SeoData";
 import SideFilter from "../../components/ProductListing/SideFilter";
 import { useAuth } from "../../context/auth";
+import { fetchCatalog, fetchProductCategories } from "../../utils/productApi";
 
 const Products = () => {
     const location = useLocation();
     const { auth, isAdmin } = useAuth();
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [retryCount, setRetryCount] = useState(0);
 
     const [price, setPrice] = useState([0, 200000]);
     // console.log(location.search);
-    const [category, setCategory] = useState(
-        location.search ? location.search.split("=")[1] : ""
-    );
+    const searchParams = new URLSearchParams(location.search);
+    const [category, setCategory] = useState(searchParams.get("category") || "");
     const [ratings, setRatings] = useState(0);
     const [products, setProducts] = useState([]);
+    const [productSource, setProductSource] = useState("");
+    const [categoryOptions, setCategoryOptions] = useState([]);
     const [wishlistItems, setWishlistItems] = useState([]);
 
     // pagination----->
     const [currentPage, setCurrentPage] = useState(1);
-    const [productsCount, setProductsCount] = useState(products?.length);
+    const [productsCount, setProductsCount] = useState(0);
     const productsPerPage = 8;
     // Calculate the total number of pages
     const totalPages = Math.ceil(productsCount / productsPerPage);
@@ -37,61 +41,96 @@ const Products = () => {
     //updating the products to display on current page
     const currentProducts = products.slice(startIndex, endIndex);
 
+    useEffect(() => {
+        setCategory(new URLSearchParams(location.search).get("category") || "");
+    }, [location.search]);
+
+    useEffect(() => {
+        let active = true;
+        fetchProductCategories()
+            .then((options) => {
+                if (active) setCategoryOptions(options);
+            })
+            .catch((error) => {
+                console.error("Error fetching product categories:", error);
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+
     // Handle page change
     const handlePageChange = (event, page) => {
         setCurrentPage(page);
     };
 
     useEffect(() => {
-        toast(
-            "The backend is starting up, please wait for a minute if the loader is visible."
-        );
-
-        //fetching filtered products from sever
+        let active = true;
         const fetchFilteredData = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get(
-                    `${
-                        import.meta.env.VITE_SERVER_URL
-                    }/api/v1/product/filtered-products`,
-                    {
-                        params: {
-                            category: category,
-                            priceRange: [
-                                parseInt(price[0].toFixed()),
-                                parseInt(price[1].toFixed()),
-                            ],
-                            ratings: ratings,
-                        },
+                setLoadError(false);
+                const catalog = await fetchCatalog({ category, query: new URLSearchParams(location.search).get("q") || "" });
+                const allProducts = catalog.products;
+                const query = new URLSearchParams(location.search)
+                    .get("q")
+                    ?.trim()
+                    .toLowerCase();
+                const filteredProducts = allProducts.filter((product) => {
+                    if (
+                        !product ||
+                        !product.id ||
+                        !product.title ||
+                        !product.image ||
+                        !product.category ||
+                        !Number.isFinite(Number(product.price))
+                    ) {
+                        return false;
                     }
-                );
-                // console.log(res.data);
+                    const matchesPrice =
+                        Number(product.price) >= price[0] &&
+                        Number(product.price) <= price[1];
+                    const productRating = Number(product.rating?.rate) || 0;
+                    const matchesRating = productRating >= Number(ratings);
+                    const matchesQuery =
+                        !query ||
+                        `${product.title} ${product.description} ${product.category}`
+                            .toLowerCase()
+                            .includes(query);
 
-                res.status === 404 &&
-                    toast.error("No Products Found!", {
-                        toastId: "productNotFound",
-                    });
-
-                res.status === 201 && setProducts(res.data.products);
-                setLoading(false);
-                setProductsCount(res.data.products.length);
-            } catch (error) {
-                console.error("Error fetching data:", error);
-                setLoading(false);
-
-                //server error
-                error.response?.status === 500 &&
-                    toast.error(
-                        "Something went wrong! Please try after sometime.",
-                        {
-                            toastId: "error",
-                        }
+                    return (
+                        matchesPrice &&
+                        matchesRating &&
+                        matchesQuery
                     );
+                });
+                if (active) {
+                    setProducts(filteredProducts);
+                    setProductSource(catalog.source);
+                    setCategoryOptions(
+                        (previous) => catalog.categories || previous
+                    );
+                    setProductsCount(filteredProducts.length);
+                    setCurrentPage(1);
+                }
+            } catch (error) {
+                console.error("Error fetching catalog products:", error);
+                if (active) {
+                    setLoadError(
+                        error.response?.data?.message ||
+                            error.message ||
+                            "Products are temporarily unavailable."
+                    );
+                }
+            } finally {
+                if (active) setLoading(false);
             }
         };
         fetchFilteredData();
-    }, [price, category, ratings]);
+        return () => {
+            active = false;
+        };
+    }, [price, category, ratings, location.search, retryCount]);
 
     useEffect(() => {
         // getting user wishlist items from server
@@ -133,6 +172,7 @@ const Products = () => {
                     <SideFilter
                         price={price}
                         category={category}
+                        categories={categoryOptions}
                         ratings={ratings}
                         setPrice={setPrice}
                         setCategory={setCategory}
@@ -142,8 +182,13 @@ const Products = () => {
 
                     {/* <!-- search column --> */}
                     <div className="flex-1 relative ">
+                        {!loading && !loadError && productSource === "demo" && (
+                            <p className="mb-2 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+                                Demo catalog: add Flipkart Affiliate credentials to the backend to load live Flipkart products.
+                            </p>
+                        )}
                         {/* No products found */}
-                        {!loading && products?.length === 0 && (
+                        {!loading && !loadError && products?.length === 0 && (
                             <div className="flex flex-col items-center justify-start gap-3 bg-white shadow-sm rounded-sm p-6 sm:p-16 sm:min-h-[750px] ">
                                 <img
                                     draggable="true"
@@ -161,15 +206,33 @@ const Products = () => {
                             </div>
                         )}
 
+                        {!loading && loadError && (
+                            <div className="flex min-h-[420px] flex-col items-center justify-center gap-3 bg-white p-8 text-center">
+                                <h1 className="text-2xl font-medium">
+                                    Products are temporarily unavailable
+                                </h1>
+                                <p className="text-gray-600">
+                                    {loadError}
+                                </p>
+                                <button
+                                    type="button"
+                                    onClick={() => setRetryCount((count) => count + 1)}
+                                    className="rounded-sm bg-[#2874f0] px-5 py-2.5 font-medium text-white"
+                                >
+                                    Try again
+                                </button>
+                            </div>
+                        )}
+
                         {loading ? (
                             <Spinner />
                         ) : (
-                            products?.length !== 0 && (
+                            !loadError && products?.length !== 0 && (
                                 <div className="flex flex-col gap-2 pb-4 justify-center items-center w-full overflow-hidden bg-white">
                                     <div className="grid grid-cols-1 gap-1 sm:grid-cols-4 w-full place-content-start overflow-hidden pb-4 min-h-[750px] ">
                                         {currentProducts?.map((product) => (
                                             <Product
-                                                key={product._id}
+                                                key={product.id}
                                                 {...product}
                                                 wishlistItems={wishlistItems}
                                                 setWishlistItems={
