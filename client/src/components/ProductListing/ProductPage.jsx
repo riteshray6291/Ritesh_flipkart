@@ -329,7 +329,9 @@ const ProductDetails = () => {
                     <p className="max-w-md text-gray-600">
                         {loadError === "not-found"
                             ? "This product may have been removed or the link may be incorrect."
-                            : "Please check your connection and try again."}
+                                                        : loadError === "failed"
+                                                            ? "Please check your connection and try again."
+                                                            : loadError}
                     </p>
                     <div className="flex flex-wrap justify-center gap-3">
                         <button
@@ -353,6 +355,11 @@ const ProductDetails = () => {
                     <ScrollToTopOnRouteChange />
                     <MinCategory />
                     <main className="mt-5 sm:mt-0">
+                        {product.source === "demo" && (
+                            <p className="bg-amber-50 px-4 py-2 text-sm text-amber-900">
+                                Demo catalog product. Flipkart Affiliate credentials are not configured.
+                            </p>
+                        )}
                         {/* <!-- product image & description container --> */}
                         <div className="w-full flex flex-col lg:flex-row bg-white sm:p-2 relative">
                             {/* <!-- image wrapper --> */}
@@ -402,7 +409,10 @@ const ProductDetails = () => {
                                         )}
                                         <div
                                             className={`absolute top-4 right-4 shadow-lg bg-white w-9 h-9 border flex items-center justify-center rounded-full ${
-                                                isAdmin || !/^[a-f\d]{24}$/i.test(product._id)
+                                                isAdmin ||
+                                                product.source === "affiliate" ||
+                                                product.source === "demo" ||
+                                                !/^[a-f\d]{24}$/i.test(product._id)
                                                     ? "hidden"
                                                     : ""
                                             } `}
@@ -424,6 +434,7 @@ const ProductDetails = () => {
                                         </div>
                                     </div>
 
+                                    {!['affiliate', 'demo'].includes(product.source) && (
                                     <div className="flex items-center gap-3 px-1 text-sm">
                                         <span className="font-medium">Quantity</span>
                                         <div className="flex items-center border">
@@ -450,9 +461,30 @@ const ProductDetails = () => {
                                             </button>
                                         </div>
                                     </div>
+                                    )}
 
                                     <div className="w-full flex gap-3">
-                                        {/* <!-- add to cart btn --> */}
+                                        {product.source === "affiliate" ? (
+                                            product.productUrl ? (
+                                                <a
+                                                    href={product.productUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex w-full items-center justify-center gap-2 rounded-sm bg-[#fb641b] p-4 font-medium text-white shadow hover:shadow-lg"
+                                                >
+                                                    View on Flipkart
+                                                </a>
+                                            ) : (
+                                                <p className="w-full bg-gray-50 p-4 text-center text-sm text-gray-600">
+                                                    Official product link unavailable.
+                                                </p>
+                                            )
+                                        ) : product.source === "demo" ? (
+                                            <p className="w-full bg-amber-50 p-4 text-center text-sm text-amber-900">
+                                                Demo products cannot be purchased through this store.
+                                            </p>
+                                        ) : (
+                                            <>
                                         {product.stock > 0 && (
                                             <button
                                                 onClick={
@@ -485,7 +517,8 @@ const ProductDetails = () => {
                                                 ? "OUT OF STOCK"
                                                 : "BUY NOW"}
                                         </button>
-                                        {/* <!-- add to cart btn --> */}
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                                 {/* <!-- img box --> */}
@@ -503,6 +536,7 @@ const ProductDetails = () => {
                                         {product?.category}
                                     </p>
                                     {/* <!-- rating badge --> */}
+                                    {product.source !== "affiliate" && (
                                     <span className="text-md text-gray-500 font-medium flex gap-2 items-center">
                                         <span className="text-xs px-1.5 py-0.5 bg-primaryGreen rounded-sm text-white flex items-center gap-0.5">
                                             {product?.ratings?.toFixed(1)}
@@ -520,6 +554,7 @@ const ProductDetails = () => {
                                             />
                                         </span>
                                     </span>
+                                    )}
                                     {/* <!-- rating badge --> */}
 
                                     {/* <!-- price desc --> */}

@@ -96,6 +96,8 @@ CLOUD_NAME=CLOUDINARY_CLOUD_NAME
 CLOUD_API_KEY=CLOUDINARY_API_KEY
 CLOUD_SECRET=CLOUDINARY_SECRET_KEY
 STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET_KEY
+FLIPKART_AFFILIATE_ID=YOUR_FLIPKART_AFFILIATE_TRACKING_ID
+FLIPKART_AFFILIATE_TOKEN=YOUR_FLIPKART_AFFILIATE_API_TOKEN
 ```
 
 ### Frontend (.env)
@@ -103,9 +105,22 @@ STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET_KEY
 ```plaintext
 VITE_API=http://localhost:8080
 VITE_STRIPE_PUBLISH_KEY=YOUR_STRIPE_PUBLISH_KEY
-VITE_STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET_KEY
 VITE_SERVER_URL=SERVER_BASE_URL_WITHOUT_TRAILING_SLASH (in case you want deployed server url- https://e-commerce-mgtd.onrender.com without any / at end)
+VITE_DEMO_API_URL=https://fakestoreapi.com
 ```
+
+### Flipkart Affiliate product catalog
+
+The product catalog uses the official Affiliate API only when valid Affiliate API access is configured. Register at [Flipkart Affiliate](https://affiliate.flipkart.com/registerme), then generate the tracking ID and API token from the [API Token page](https://affiliate.flipkart.com/api/api-token) after signing in. See the [Affiliate API overview](https://affiliate.flipkart.com/api-docs/af_overview.html), [product API reference](https://affiliate.flipkart.com/api-docs/af_prod_ref.html), and [registration instructions](https://affiliate.flipkart.com/api-docs/af_register.html).
+
+Put the generated values in `backend/.env` only:
+
+```plaintext
+FLIPKART_AFFILIATE_ID=your_tracking_id
+FLIPKART_AFFILIATE_TOKEN=your_api_token
+```
+
+Do not add Affiliate credentials to `client/.env` or commit `backend/.env`. The Affiliate ID and token are sent by the Express backend as `Fk-Affiliate-Id` and `Fk-Affiliate-Token` headers. When either setting is missing, the catalog clearly identifies itself as demo data from Fake Store API. Once credentials are present, upstream authentication or API errors are shown instead of silently falling back to demo data. Affiliate products link to Flipkart using the official product URL; they do not enter the MongoDB-backed checkout flow.
 
 ## Contributing
 
