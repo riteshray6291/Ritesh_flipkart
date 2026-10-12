@@ -51,6 +51,8 @@ const OrderDetails = () => {
     const shippingInfo = orderDetails?.shippingInfo;
     const createdAt = orderDetails?.createdAt;
     const orderStatus = orderDetails?.orderStatus;
+    const paymentMethod = orderDetails?.paymentMethod || "stripe";
+    const paymentStatus = orderDetails?.paymentStatus || "paid";
 
     return (
         <>
@@ -87,6 +89,21 @@ const OrderDetails = () => {
                                 </div>
                                 <div className="w-full sm:w-1/2">
                                     <div className="flex flex-col gap-3 my-8 mx-10">
+                                        <h3 className="text-md font-[600]">
+                                            Payment details
+                                        </h3>
+                                        <div className="flex items-center justify-between gap-4 text-sm">
+                                            <span>Method</span>
+                                            <span className="font-medium">
+                                                {paymentMethod === "cod" ? "Cash on Delivery" : "Credit or debit card"}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-4 text-sm">
+                                            <span>Status</span>
+                                            <span className="font-medium capitalize">
+                                                {paymentStatus === "pending" ? "Pay on delivery" : paymentStatus}
+                                            </span>
+                                        </div>
                                         <h3 className=" text-md font-[600]">
                                             More Actions
                                         </h3>

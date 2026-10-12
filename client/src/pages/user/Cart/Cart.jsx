@@ -6,56 +6,13 @@ import SaveForLater from "./SaveForLater";
 import ScrollToTopOnRouteChange from "./../../../utils/ScrollToTopOnRouteChange";
 import SeoData from "../../../SEO/SeoData";
 import PriceCard from "./PriceCard";
-import { useAuth } from "../../../context/auth";
-import { loadStripe } from "@stripe/stripe-js";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
 const Cart = () => {
-    const { auth } = useAuth();
     const navigate = useNavigate();
-    const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
-    let frontendURL = window.location.origin; // Get the frontend URL
-    const [cartItems, setCartItems, , , saveLaterItems] = useCart();
+    const [cartItems, , , , saveLaterItems] = useCart();
 
-    //PAYMENT USING STRIPE
-    const handlePayment = async () => {
-        if (import.meta.env.VITE_PAYMENT_MODE === "fake") {
-            navigate("/shipping");
-            return;
-        }
-
-        const response = await axios.post(
-            `${
-                import.meta.env.VITE_SERVER_URL
-            }/api/v1/user/create-checkout-session`,
-            {
-                products: cartItems,
-                frontendURL: frontendURL,
-                customerEmail: auth?.user?.email,
-            },
-            {
-                headers: {
-                    Authorization: auth?.token,
-                },
-            }
-        );
-        const session = response.data.session;
-        const stripe = await loadStripe(publishKey);
-        if (!stripe) throw new Error("Stripe could not be initialized. Check VITE_STRIPE_PUBLISH_KEY.");
-        //storing session id to retrieve payment details after successful
-        const result = await stripe.redirectToCheckout({
-            sessionId: session.id,
-        });
-
-        if (result.error) {
-            throw result.error;
-        }
-    };
-
-    const placeOrderHandler = () => {
-        handlePayment();
-    };
+    const placeOrderHandler = () => navigate("/shipping");
 
     return (
         <>

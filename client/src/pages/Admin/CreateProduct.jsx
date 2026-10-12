@@ -8,7 +8,6 @@ import ImageIcon from "@mui/icons-material/Image";
 import { categories } from "../../utils/constants";
 import Spinner from "../../components/Spinner";
 import axios from "axios";
-import FormData from "form-data";
 import { useAuth } from "../../context/auth";
 import ScrollToTopOnRouteChange from "./../../utils/ScrollToTopOnRouteChange";
 import SeoData from "../../SEO/SeoData";
@@ -51,7 +50,10 @@ const CreateProduct = () => {
     };
 
     const addSpecs = () => {
-        if (!specsInput.title.trim() && !specsInput.description.trim()) return;
+        if (!specsInput.title.trim() || !specsInput.description.trim()) {
+            toast.warning("Enter both a specification name and description.");
+            return;
+        }
         setSpecs([...specs, specsInput]);
         setSpecsInput({ title: "", description: "" });
     };
@@ -72,6 +74,7 @@ const CreateProduct = () => {
 
     const handleLogoChange = (e) => {
         const file = e.target.files[0];
+        if (!file) return;
 
         if (file.size > MAX_IMAGE_SIZE) {
             toast.warning("Logo image size exceeds 500 KB!");
@@ -169,21 +172,25 @@ const CreateProduct = () => {
                 formData,
                 {
                     headers: {
-                        "Content-Type": "multipart/form-data",
                         Authorization: auth?.token,
                     },
                 }
             );
             // on success->
-            response.status === 201 &&
-                toast.success("Product Added Successfully!");
+            if (response.status !== 201) {
+                throw new Error(response.data?.message || "Product could not be created.");
+            }
+            toast.success("Product Added Successfully!");
             navigate("/admin/dashboard/all-products");
         } catch (error) {
             console.error("Error:", error);
+            toast.error(
+                error.response?.data?.message ||
+                    error.message ||
+                    "Unable to add the product. Please try again."
+            );
+        } finally {
             setIsSubmit(false);
-            //server error
-            error.response.status === 500 &&
-                toast.error("Something went wrong! Please try after sometime.");
         }
     };
 
@@ -466,7 +473,6 @@ const CreateProduct = () => {
 
                         <div className="flex justify-end">
                             <input
-                                form="mainForm"
                                 type="submit"
                                 className="bg-orange uppercase w-full p-3 text-white font-medium rounded shadow hover:shadow-lg cursor-pointer"
                                 value="Submit"

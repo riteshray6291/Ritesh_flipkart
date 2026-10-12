@@ -5,6 +5,7 @@ const getOrders = async (req, res) => {
     try {
         const order = await orderModel
             .find({ buyer: req.user._id })
+            .sort({ createdAt: -1 })
             .populate({ path: "buyer", model: userModel })
             .populate({ path: "products.seller", model: userModel });
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
@@ -9,6 +9,8 @@ import SeoData from "../../../SEO/SeoData";
 
 const OrderSuccess = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const isCashOnDelivery = searchParams.get("payment") === "cod";
     const [time, setTime] = useState(3);
     const [cartItems, setCartItems] = useCart();
     const { auth } = useAuth();
@@ -18,17 +20,22 @@ const OrderSuccess = () => {
 
     // Payment session and shipping details are kept with the signed-in account.
     useEffect(() => {
-        if (!auth?.token) return;
+        if (!auth?.token || isCashOnDelivery) return;
         axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/user/pending-payment-session`, {
             headers: { Authorization: auth.token },
         }).then(({ data }) => setSessionId(data.sessionId))
             .catch((error) => console.error("Unable to load payment session:", error));
-    }, [auth?.token]);
+    }, [auth?.token, isCashOnDelivery]);
 
     // After order placement, remove items from cart and save details to the database
     useEffect(() => {
         const savePayment = async () => {
             try {
+                if (isCashOnDelivery) {
+                    setHasSavedPayment(true);
+                    setLoading(false);
+                    return;
+                }
                 setLoading(true);
                 const shipping = await axios.get(
                     `${import.meta.env.VITE_SERVER_URL}/api/v1/user/shipping-info`,
@@ -60,10 +67,13 @@ const OrderSuccess = () => {
             }
         };
 
-        if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
+        if (isCashOnDelivery) {
+            setHasSavedPayment(true);
+            setLoading(false);
+        } else if (sessionId && cartItems.length > 0 && !hasSavedPayment) {
             savePayment(); // Ensure the API call is only triggered once
         }
-    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems]);
+    }, [sessionId, auth?.token, cartItems, hasSavedPayment, setCartItems, isCashOnDelivery]);
 
     // Timer to redirect after 3 sec
     let intervalId = useRef(null);
@@ -92,12 +102,14 @@ const OrderSuccess = () => {
                     <div className="flex flex-col gap-2 items-center justify-center sm:w-4/6 m-auto bg-white shadow rounded p-6 min-h-[60vh]">
                         <div className="flex gap-4 items-center">
                             <h1 className="text-2xl font-semibold">
-                                Transaction Successful
+                                {isCashOnDelivery ? "Order placed" : "Transaction Successful"}
                             </h1>
                             <CheckCircleOutlineIcon className="text-primaryBlue" />
                         </div>
                         <p className="mt-4 text-lg text-gray-800">
-                            Redirecting to orders in {time} sec
+                            {isCashOnDelivery
+                                ? "Cash on Delivery selected. Pay the delivery partner when your order arrives."
+                                : `Redirecting to orders in ${time} sec`}
                         </p>
                         <Link
                             to="/user/orders"

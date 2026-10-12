@@ -6,6 +6,21 @@ const orderSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
+    idempotencyKey: {
+        type: String,
+        unique: true,
+        sparse: true,
+    },
+    paymentMethod: {
+        type: String,
+        enum: ["stripe", "upi", "card", "cod", "netbanking"],
+        default: "card",
+    },
+    paymentStatus: {
+        type: String,
+        enum: ["PENDING", "PAID", "FAILED", "PROCESSING", "pending", "paid", "failed"],
+        default: "PAID",
+    },
     products: [
         {
             name: {
@@ -77,6 +92,18 @@ const orderSchema = new mongoose.Schema({
         default: "Processing",
     },
     amount: {
+        type: Number,
+        default: 0,
+    },
+    subtotal: {
+        type: Number,
+        default: 0,
+    },
+    discount: {
+        type: Number,
+        default: 0,
+    },
+    deliveryCharge: {
         type: Number,
         default: 0,
     },

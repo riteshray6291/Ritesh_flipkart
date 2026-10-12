@@ -53,6 +53,8 @@ const UpdateOrders = () => {
     const shippingInfo = UpdateOrders?.shippingInfo;
     const createdAt = UpdateOrders?.createdAt;
     const orderStatus = UpdateOrders?.orderStatus;
+    const paymentMethod = UpdateOrders?.paymentMethod || "stripe";
+    const paymentStatus = UpdateOrders?.paymentStatus || "paid";
 
     const updateOrderSubmitHandler = async (e) => {
         try {
@@ -139,6 +141,10 @@ const UpdateOrders = () => {
                                                     <p className="text-sm">
                                                         {orderStatus}
                                                     </p>
+                                                </div>
+                                                <div className="flex gap-2 text-sm">
+                                                    <p className="font-medium">Payment:</p>
+                                                    <p>{paymentMethod === "cod" ? "Cash on Delivery" : "Credit or debit card"} ({paymentStatus === "pending" ? "pay on delivery" : paymentStatus})</p>
                                                 </div>
                                                 <FormControl
                                                     fullWidth

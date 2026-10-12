@@ -132,6 +132,8 @@ Contributions are welcome! Feel free to open issues or submit pull requests to i
 
 ## Local fake payments
 
+Checkout offers Stripe card payment and Cash on Delivery. Cash on Delivery places the order immediately, reserves current MongoDB stock, and records payment as due on delivery. Card payments use Stripe Checkout.
+
 For local development without Stripe credentials, set both environment values:
 
 ```plaintext

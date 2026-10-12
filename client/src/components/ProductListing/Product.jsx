@@ -10,6 +10,7 @@ import { toast } from "react-toastify";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
 import { MAX_COMPARE_ITEMS, useCompare } from "../../context/compare";
+import { useCart } from "../../context/cart";
 
 const Product = ({
     _id,
@@ -32,9 +33,12 @@ const Product = ({
     highlights,
     keySpecs,
     brand,
+    stock,
+    seller,
 }) => {
     const { auth, isAdmin } = useAuth();
     const { items: compareItems, toggleCompare } = useCompare();
+    const [, , addItems] = useCart();
     const productId = _id || id;
     const productName = name || title || "Product";
     const imageUrl = images?.[0]?.url || image;
@@ -131,6 +135,19 @@ const Product = ({
         });
     };
 
+    const addToCartHandler = () => {
+        addItems({
+            productId: _id,
+            name: productName,
+            stock,
+            image: imageUrl,
+            brandName: brand?.name || "Flipkart",
+            price: originalPrice,
+            discountPrice: currentPrice,
+            seller,
+        }, 1);
+    };
+
     return (
         <>
             <ScrollToTopOnRouteChange />
@@ -159,6 +176,16 @@ const Product = ({
                         className={`absolute bottom-2 left-2 z-10 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${isCompared ? "border-[#2874f0] bg-[#2874f0] text-white" : "border-slate-200 bg-white text-slate-700 hover:border-[#2874f0] hover:text-[#2874f0]"}`}
                     >
                         {isCompared ? "Added to compare" : "Compare"}
+                    </button>
+                )}
+                {_id && (
+                    <button
+                        type="button"
+                        onClick={addToCartHandler}
+                        disabled={Number(stock) < 1}
+                        className="absolute bottom-2 right-2 z-10 rounded-full bg-[#fb641b] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#e85b17] disabled:cursor-not-allowed disabled:bg-slate-400 sm:px-4"
+                    >
+                        Add to Cart
                     </button>
                 )}
                 {/* <!-- wishlist badge --> */}

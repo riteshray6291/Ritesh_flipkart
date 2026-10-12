@@ -11,6 +11,29 @@ const serverUrl = (
 ).replace(/\/$/, "");
 const cartUrl = `${serverUrl}/api/v1/user/cart`;
 
+const readLocalItems = (key) => {
+    try {
+        const items = JSON.parse(localStorage.getItem(key) || "[]");
+        return Array.isArray(items) ? items : [];
+    } catch {
+        return [];
+    }
+};
+
+const mergeCartItems = (savedItems, guestItems) => {
+    const merged = new Map(savedItems.map((item) => [item.productId, item]));
+    guestItems.forEach((item) => {
+        const saved = merged.get(item.productId);
+        merged.set(
+            item.productId,
+            saved
+                ? { ...saved, quantity: Number(saved.quantity || 0) + Number(item.quantity || 0) }
+                : item
+        );
+    });
+    return [...merged.values()];
+};
+
 // eslint-disable-next-line react/prop-types
 const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
@@ -19,8 +42,15 @@ const CartProvider = ({ children }) => {
 
     const persist = useCallback(async (nextCart, nextLater) => {
         if (!auth?.token) {
-            toast.info("Sign in to save your cart.");
-            return false;
+            setCartItems(nextCart);
+            setSaveLaterItems(nextLater);
+            try {
+                localStorage.setItem("cart", JSON.stringify(nextCart));
+                localStorage.setItem("saveLater", JSON.stringify(nextLater));
+            } catch {
+                // Keep the current session cart usable if browser storage is unavailable.
+            }
+            return true;
         }
         try {
             const response = await axios.put(
@@ -41,8 +71,8 @@ const CartProvider = ({ children }) => {
         let cancelled = false;
         const loadCart = async () => {
             if (!auth?.token) {
-                setCartItems([]);
-                setSaveLaterItems([]);
+                setCartItems(readLocalItems("cart"));
+                setSaveLaterItems(readLocalItems("saveLater"));
                 return;
             }
             try {
@@ -53,12 +83,11 @@ const CartProvider = ({ children }) => {
 
                 let nextCart = response.data.cartItems || [];
                 let nextLater = response.data.saveLaterItems || [];
-                // One-time transfer of carts created before MongoDB persistence was enabled.
-                const legacyCart = JSON.parse(localStorage.getItem("cart") || "[]");
-                const legacyLater = JSON.parse(localStorage.getItem("saveLater") || "[]");
-                if (!nextCart.length && !nextLater.length && (legacyCart.length || legacyLater.length)) {
-                    nextCart = legacyCart;
-                    nextLater = legacyLater;
+                const guestCart = readLocalItems("cart");
+                const guestLater = readLocalItems("saveLater");
+                if (guestCart.length || guestLater.length) {
+                    nextCart = mergeCartItems(nextCart, guestCart);
+                    nextLater = mergeCartItems(nextLater, guestLater);
                     const saved = await axios.put(
                         cartUrl,
                         { cartItems: nextCart, saveLaterItems: nextLater },
@@ -116,6 +145,7 @@ const CartProvider = ({ children }) => {
     );
 
     const replaceCartItems = useCallback((items) => persist(items, saveLaterItems), [persist, saveLaterItems]);
+    const clearCartAfterOrder = useCallback(() => setCartItems([]), []);
 
     return (
         <CartContext.Provider value={[
@@ -127,6 +157,7 @@ const CartProvider = ({ children }) => {
             addLater,
             moveToCart,
             removeLater,
+            clearCartAfterOrder,
         ]}>
             {children}
         </CartContext.Provider>
