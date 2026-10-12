@@ -90,7 +90,7 @@ const UserProfile = () => {
             setProfile(false);
 
             const response = await axios.post(
-                `${import.meta.env.VITE_SERVER_URL}api/v1/auth/update-details`,
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/update-details`,
                 {
                     newPhone: phone,
                     email: auth?.user?.email,

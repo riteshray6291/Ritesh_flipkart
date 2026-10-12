@@ -9,18 +9,21 @@ import PriceCard from "./PriceCard";
 import { useAuth } from "../../../context/auth";
 import { loadStripe } from "@stripe/stripe-js";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 const Cart = () => {
     const { auth } = useAuth();
-    //stripe details
+    const navigate = useNavigate();
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
-    const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
     let frontendURL = window.location.origin; // Get the frontend URL
     const [cartItems, setCartItems, , , saveLaterItems] = useCart();
 
     //PAYMENT USING STRIPE
     const handlePayment = async () => {
-        const stripe = await loadStripe(publishKey);
+        if (import.meta.env.VITE_PAYMENT_MODE === "fake") {
+            navigate("/shipping");
+            return;
+        }
 
         const response = await axios.post(
             `${
@@ -38,16 +41,15 @@ const Cart = () => {
             }
         );
         const session = response.data.session;
-        console.log("session: ", session);
+        const stripe = await loadStripe(publishKey);
+        if (!stripe) throw new Error("Stripe could not be initialized. Check VITE_STRIPE_PUBLISH_KEY.");
         //storing session id to retrieve payment details after successful
-        localStorage.setItem("sessionId", session.id);
-        const result = stripe.redirectToCheckout({
+        const result = await stripe.redirectToCheckout({
             sessionId: session.id,
         });
-        console.log("result: ", result);
 
         if (result.error) {
-            console.log(result.error);
+            throw result.error;
         }
     };
 

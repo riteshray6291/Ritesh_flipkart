@@ -14,8 +14,8 @@ export class FlipkartAffiliateError extends Error {
 
 export const isAffiliateConfigured = () =>
     Boolean(
-        process.env.FLIPKART_AFFILIATE_ID &&
-            process.env.FLIPKART_AFFILIATE_TOKEN
+        process.env.FLIPKART_AFFILIATE_ID?.trim() &&
+            process.env.FLIPKART_AFFILIATE_TOKEN?.trim()
     );
 
 const getCredentials = () => {
@@ -64,6 +64,7 @@ const requestJson = async (url) => {
                 "Fk-Affiliate-Token": affiliateToken,
                 Accept: "application/json",
             },
+            redirect: "error",
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         });
     } catch (error) {
@@ -199,6 +200,26 @@ const amount = (value) => {
     return Number.isFinite(parsed) ? parsed : null;
 };
 
+const toHttpsUrl = (value) => {
+    try {
+        const url = new URL(value);
+        if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+        url.protocol = "https:";
+        return url.toString();
+    } catch {
+        return "";
+    }
+};
+
+const officialProductUrl = (value) => {
+    const result = toHttpsUrl(value);
+    if (!result) return "";
+    const url = new URL(result);
+    return url.hostname === "flipkart.com" || url.hostname.endsWith(".flipkart.com")
+        ? result
+        : "";
+};
+
 const normalizeProduct = (entry, categoryName = "") => {
     const productBase =
         entry?.productBaseInfoV1 || entry?.productBaseInfo || entry;
@@ -215,12 +236,13 @@ const normalizeProduct = (entry, categoryName = "") => {
         amount(attributes?.sellingPrice) ??
         amount(attributes?.flipkartSellingPrice);
     const mrp = amount(attributes?.maximumRetailPrice);
-    const image =
+    const image = toHttpsUrl(
         imageUrls["400x400"] ||
         imageUrls["800x800"] ||
         imageUrls["200x200"] ||
         imageUrls.unknown ||
-        Object.values(imageUrls).find((value) => typeof value === "string");
+        Object.values(imageUrls).find((value) => typeof value === "string")
+    );
 
     if (!id || !attributes?.title || !image || price === null) return null;
 
@@ -235,7 +257,7 @@ const normalizeProduct = (entry, categoryName = "") => {
         imageUrls,
         price,
         mrp: mrp ?? price,
-        productUrl: attributes.productUrl || "",
+        productUrl: officialProductUrl(attributes.productUrl),
         brand: attributes.productBrand || "",
         inStock: attributes.inStock !== false,
         rating: null,
@@ -365,16 +387,21 @@ export const getAffiliateProducts = async ({ category = "", query = "" } = {}) =
     if (query.trim()) {
         products = await fetchSearchProducts(query.trim());
         if (category) {
-            const selectedNames = selectedCategories.map((item) =>
-                `${item.id} ${item.name}`.toLowerCase().replace(/[_-]+/g, " ")
-            );
-            products = products.filter((product) =>
-                selectedNames.some((name) =>
-                    `${product.category} ${product.categoryPath.join(" ")}`
+            const normalizedCategory = category.trim().toLowerCase();
+            const matcher = groupMatchers[
+                normalizedCategory.replace(/\s+/g, "-")
+            ];
+            products = products.filter((product) => {
+                const productCategories =
+                    `${product.category} ${product.categoryPath.join(" ")}`;
+                if (matcher) return matcher.test(productCategories);
+
+                return selectedCategories.some((selected) =>
+                    productCategories
                         .toLowerCase()
-                        .includes(name.trim())
-                )
-            );
+                        .includes(selected.name.toLowerCase())
+                );
+            });
         }
     } else {
         const results = await mapConcurrent(

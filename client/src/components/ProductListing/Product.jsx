@@ -9,11 +9,13 @@ import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
 import { toast } from "react-toastify";
 import axios from "axios";
 import { useAuth } from "../../context/auth";
+import { MAX_COMPARE_ITEMS, useCompare } from "../../context/compare";
 
 const Product = ({
     _id,
     id,
     source,
+    productUrl,
     images,
     image,
     name,
@@ -23,11 +25,16 @@ const Product = ({
     numOfReviews,
     rating,
     price,
+    mrp,
     discountPrice,
     wishlistItems,
     setWishlistItems,
+    highlights,
+    keySpecs,
+    brand,
 }) => {
     const { auth, isAdmin } = useAuth();
+    const { items: compareItems, toggleCompare } = useCompare();
     const productId = _id || id;
     const productName = name || title || "Product";
     const imageUrl = images?.[0]?.url || image;
@@ -36,8 +43,23 @@ const Product = ({
     );
     const reviewCount = numOfReviews ?? rating?.count ?? 0;
     const currentPrice = discountPrice ?? price ?? 0;
-    const originalPrice = price ?? currentPrice;
+    const originalPrice = mrp ?? price ?? currentPrice;
     const canUpdateWishlist = Boolean(_id);
+    const compareId = `${source || "store"}:${productId}`;
+    const isCompared = compareItems.some((item) => item.id === compareId);
+    const isAffiliateProduct = source === "affiliate" && productUrl;
+    const ProductLink = isAffiliateProduct ? "a" : Link;
+    const productLinkProps = isAffiliateProduct
+        ? {
+              href: productUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+          }
+        : {
+              to: productId
+                  ? `/product/${productId}${source ? `?source=${source}` : ""}`
+                  : "/products",
+          };
 
     //check if item is present in user wishlist or not
     const itemInWishlist = wishlistItems?.some((itemId) => {
@@ -87,6 +109,28 @@ const Product = ({
         }
     };
 
+    const toggleCompareHandler = () => {
+        if (!isCompared && compareItems.length >= MAX_COMPARE_ITEMS) {
+            toast.info("Compare up to 3 products at a time.");
+            return;
+        }
+        toggleCompare({
+            id: compareId,
+            title: productName,
+            image: imageUrl,
+            category: category || "",
+            price: currentPrice,
+            originalPrice,
+            rating: ratingValue,
+            brand: typeof brand === "string" ? brand : brand?.name || "",
+            highlights: (highlights || keySpecs || []).slice(0, 5).map((item) =>
+                typeof item === "string" ? item : item?.text || item?.value || item?.key || ""
+            ).filter(Boolean),
+            source: source || "store",
+            productUrl,
+        });
+    };
+
     return (
         <>
             <ScrollToTopOnRouteChange />
@@ -107,15 +151,19 @@ const Product = ({
                 >
                     <FavoriteIcon sx={{ fontSize: "20px" }} />
                 </button>
+                {productId && (
+                    <button
+                        type="button"
+                        onClick={toggleCompareHandler}
+                        aria-pressed={isCompared}
+                        className={`absolute bottom-2 left-2 z-10 rounded-full border px-3 py-1 text-xs font-semibold shadow-sm ${isCompared ? "border-[#2874f0] bg-[#2874f0] text-white" : "border-slate-200 bg-white text-slate-700 hover:border-[#2874f0] hover:text-[#2874f0]"}`}
+                    >
+                        {isCompared ? "Added to compare" : "Compare"}
+                    </button>
+                )}
                 {/* <!-- wishlist badge --> */}
-                <Link
-                    to={
-                        productId
-                            ? `/product/${productId}${
-                                  source ? `?source=${source}` : ""
-                              }`
-                            : "/products"
-                    }
+                <ProductLink
+                    {...productLinkProps}
                     className="flex flex-col items-center gap-2 w-full px-4 py-6 relative hover:shadow-lg rounded-sm"
                 >
                     {/* <!-- image & product title --> */}
@@ -181,7 +229,7 @@ const Product = ({
                         {/* <!-- price container --> */}
                     </div>
                     {/* <!-- product description --> */}
-                </Link>
+                </ProductLink>
             </div>
         </>
     );

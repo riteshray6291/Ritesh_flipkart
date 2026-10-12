@@ -10,9 +10,15 @@ import getOrderDetail from "../controllers/user/getOrderDetail.js";
 import getAdminOrders from "../controllers/user/getAdminOrders.js";
 import updateOrder from "../controllers/user/updateOrder.js";
 import getAllUserOrder from "../controllers/user/getAllUserOrder.js";
+import { getCart, saveCart, getShippingInfo, saveShippingInfo } from "../controllers/user/cart.js";
 
 //router object
 const router = express.Router();
+
+router.get("/cart", requireSignIn, getCart);
+router.put("/cart", requireSignIn, saveCart);
+router.get("/shipping-info", requireSignIn, getShippingInfo);
+router.put("/shipping-info", requireSignIn, saveShippingInfo);
 
 //routing
 //get Wishlist Items id
@@ -25,7 +31,10 @@ router.post("/update-wishlist", requireSignIn, updateWishlist);
 router.get("/wishlist-products", requireSignIn, getWishlistProducts);
 
 // checkout session - stripe payment
-router.post("/create-checkout-session", createSession);
+router.post("/create-checkout-session", requireSignIn, createSession);
+router.get("/pending-payment-session", requireSignIn, (req, res) => {
+    res.status(200).json({ success: true, sessionId: req.user.pendingPaymentSession || null });
+});
 router.post("/payment-success", requireSignIn, handleSuccess);
 
 // get user orders

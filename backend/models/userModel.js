@@ -37,7 +37,18 @@ const userSchema = new mongoose.Schema(
             },
         },
         wishlist: [{ type: mongoose.Schema.ObjectId, ref: "Product" }],
-       
+        cart: { type: [mongoose.Schema.Types.Mixed], default: [] },
+        saveLater: { type: [mongoose.Schema.Types.Mixed], default: [] },
+        shippingInfo: {
+            address: String,
+            city: String,
+            country: String,
+            state: String,
+            landmark: String,
+            pincode: String,
+            phoneNo: String,
+        },
+        pendingPaymentSession: String,
         
     },
     { timestamps: true }

@@ -24,7 +24,7 @@ import affiliateRoute from "./routes/affiliateRoute.js";
 const app = express();
 
 //configure env
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 //configure cloudinary
 cloudinary.config({
@@ -34,14 +34,19 @@ cloudinary.config({
 });
 
 //middleware
+const allowedOrigins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    ...(process.env.CORS_ORIGINS || "")
+        .split(",")
+        .map((origin) => origin.trim())
+        .filter(Boolean),
+];
 app.use(
     cors({
-        origin: [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5174",
-        ],
+        origin: allowedOrigins,
         credentials: true,
     })
 );
@@ -57,9 +62,6 @@ app.use(
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 // app.use(express.static(path.join(__dirname, "../client/dist")));
-//connect DB
-connectDB();
-
 //port
 const PORT = process.env.PORT || 8080;
 
@@ -77,6 +79,16 @@ app.use("/api/v1/affiliate", affiliateRoute);
 //     res.sendFile(path.join(__dirname, "../client/dist/index.html"));
 // });
 
-app.listen(PORT, () => {
-    console.log(`SERVER RUNNING ON PORT ${PORT}`);
-});
+const startServer = async () => {
+    try {
+        await connectDB();
+        app.listen(PORT, () => {
+            console.log(`SERVER RUNNING ON PORT ${PORT}`);
+        });
+    } catch (error) {
+        console.error("Failed to connect to MongoDB. The server was not started.", error.message);
+        process.exitCode = 1;
+    }
+};
+
+startServer();

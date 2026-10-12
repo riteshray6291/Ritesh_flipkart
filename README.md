@@ -90,6 +90,7 @@ Before you begin, ensure you have met the following requirements:
 
 ```plaintext
 PORT=8080
+CORS_ORIGINS=https://your-frontend.example
 MONGODB_URI=YOUR_MONGODB_BASE_URI/database_name
 JWT_SECRET=RANDOM_STRING
 CLOUD_NAME=CLOUDINARY_CLOUD_NAME
@@ -109,6 +110,8 @@ VITE_SERVER_URL=SERVER_BASE_URL_WITHOUT_TRAILING_SLASH (in case you want deploye
 VITE_DEMO_API_URL=https://fakestoreapi.com
 ```
 
+For local development, `VITE_SERVER_URL` can be `http://localhost:8080` (the frontend also accepts the older `VITE_API` name). When the frontend is deployed on a different origin, set `CORS_ORIGINS` in `backend/.env` to its full origin, such as `https://shop.example.com`. Multiple origins can be comma-separated. Restart both servers after changing environment values.
+
 ### Flipkart Affiliate product catalog
 
 The product catalog uses the official Affiliate API only when valid Affiliate API access is configured. Register at [Flipkart Affiliate](https://affiliate.flipkart.com/registerme), then generate the tracking ID and API token from the [API Token page](https://affiliate.flipkart.com/api/api-token) after signing in. See the [Affiliate API overview](https://affiliate.flipkart.com/api-docs/af_overview.html), [product API reference](https://affiliate.flipkart.com/api-docs/af_prod_ref.html), and [registration instructions](https://affiliate.flipkart.com/api-docs/af_register.html).
@@ -126,3 +129,18 @@ Do not add Affiliate credentials to `client/.env` or commit `backend/.env`. The 
 
 Contributions are welcome! Feel free to open issues or submit pull requests to improve this project.
 # Ritesh_flipkart
+
+## Local fake payments
+
+For local development without Stripe credentials, set both environment values:
+
+```plaintext
+# backend/.env
+NODE_ENV=development
+PAYMENT_MODE=fake
+
+# client/.env
+VITE_PAYMENT_MODE=fake
+```
+
+Restart the backend and Vite after changing environment files. Fake payments are accepted only when `NODE_ENV` is `development` or `test`; they create a local order and reduce stock using current MongoDB product data. They do not contact Stripe or move real money. Leave `PAYMENT_MODE=stripe` for Stripe Checkout.

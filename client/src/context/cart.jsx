@@ -1,114 +1,137 @@
-import { useContext, createContext, useState, useEffect } from "react";
+import { useContext, createContext, useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
+import axios from "axios";
+import { useAuth } from "./auth";
 
 const CartContext = createContext();
+const serverUrl = (
+    import.meta.env.VITE_SERVER_URL ||
+    import.meta.env.VITE_API ||
+    "http://localhost:8080"
+).replace(/\/$/, "");
+const cartUrl = `${serverUrl}/api/v1/user/cart`;
 
 // eslint-disable-next-line react/prop-types
 const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
     const [saveLaterItems, setSaveLaterItems] = useState([]);
-    const [reload, setReload] = useState(false);
+    const { auth } = useAuth();
+
+    const persist = useCallback(async (nextCart, nextLater) => {
+        if (!auth?.token) {
+            toast.info("Sign in to save your cart.");
+            return false;
+        }
+        try {
+            const response = await axios.put(
+                cartUrl,
+                { cartItems: nextCart, saveLaterItems: nextLater },
+                { headers: { Authorization: auth.token } }
+            );
+            setCartItems(response.data.cartItems);
+            setSaveLaterItems(response.data.saveLaterItems);
+            return true;
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Unable to save your cart.");
+            return false;
+        }
+    }, [auth?.token]);
 
     useEffect(() => {
-        // localStorage.clear();
-        const cartItems = localStorage.getItem("cart");
-        if (cartItems) {
-            setCartItems(JSON.parse(cartItems));
-        }
-        const saveLaterItems = localStorage.getItem("saveLater");
-        if (saveLaterItems) {
-            setSaveLaterItems(JSON.parse(saveLaterItems));
-        }
-    }, [reload]);
+        let cancelled = false;
+        const loadCart = async () => {
+            if (!auth?.token) {
+                setCartItems([]);
+                setSaveLaterItems([]);
+                return;
+            }
+            try {
+                const response = await axios.get(cartUrl, {
+                    headers: { Authorization: auth.token },
+                });
+                if (cancelled) return;
+
+                let nextCart = response.data.cartItems || [];
+                let nextLater = response.data.saveLaterItems || [];
+                // One-time transfer of carts created before MongoDB persistence was enabled.
+                const legacyCart = JSON.parse(localStorage.getItem("cart") || "[]");
+                const legacyLater = JSON.parse(localStorage.getItem("saveLater") || "[]");
+                if (!nextCart.length && !nextLater.length && (legacyCart.length || legacyLater.length)) {
+                    nextCart = legacyCart;
+                    nextLater = legacyLater;
+                    const saved = await axios.put(
+                        cartUrl,
+                        { cartItems: nextCart, saveLaterItems: nextLater },
+                        { headers: { Authorization: auth.token } }
+                    );
+                    nextCart = saved.data.cartItems;
+                    nextLater = saved.data.saveLaterItems;
+                }
+                if (!cancelled) {
+                    setCartItems(nextCart);
+                    setSaveLaterItems(nextLater);
+                    localStorage.removeItem("cart");
+                    localStorage.removeItem("saveLater");
+                }
+            } catch (error) {
+                if (!cancelled) toast.error(error.response?.data?.message || "Unable to load your cart.");
+            }
+        };
+        loadCart();
+        return () => { cancelled = true; };
+    }, [auth?.token]);
 
     const addItems = async (product, quantity = 1) => {
-        const existingItemIndex = cartItems.findIndex(
-            (item) => item.productId === product?.productId
-        );
-
-        if (existingItemIndex !== -1) {
-            // Create a copy of cartItems to avoid mutating state directly
-            const updatedCartItems = [...cartItems];
-
-            // Update the quantity of the existing item
-            updatedCartItems[existingItemIndex].quantity = quantity;
-
-            // Update the state with the new cart items
-            localStorage.setItem("cart", JSON.stringify(updatedCartItems));
-            setReload(!reload);
-        } else {
-            // Update the state and local storage with the new cart items
-            setCartItems([{ ...product, quantity }, ...cartItems]);
-            localStorage.setItem(
-                "cart",
-                JSON.stringify([{ ...product, quantity }, ...cartItems])
-            );
-            setReload(!reload);
-            toast.success("Product Added To Cart", {
-                style: {
-                    top: "40px",
-                },
-            });
+        const existingIndex = cartItems.findIndex((item) => item.productId === product?.productId);
+        const nextCart = existingIndex >= 0
+            ? cartItems.map((item, index) => index === existingIndex ? { ...item, quantity } : item)
+            : [{ ...product, quantity }, ...cartItems];
+        if (await persist(nextCart, saveLaterItems) && existingIndex < 0) {
+            toast.success("Product Added To Cart", { style: { top: "40px" } });
         }
     };
 
-    const removeItems = (product) => {
-        const updatedCartItems = cartItems?.filter(
-            (item) => item.productId !== product.productId
-        );
-        // setCartItems(updatedCartItems);
-        localStorage.setItem("cart", JSON.stringify(updatedCartItems));
-        setReload(!reload);
-    };
+    const removeItems = (product) => persist(
+        cartItems.filter((item) => item.productId !== product.productId),
+        saveLaterItems
+    );
+
     const addLater = (product) => {
-        removeItems(product);
-        setSaveLaterItems([product, ...saveLaterItems]);
-        localStorage.setItem(
-            "saveLater",
-            JSON.stringify([product, ...saveLaterItems])
-        );
-        setReload(!reload);
-        toast.success("Product Saved To Later", {
-            style: {
-                top: "40px",
-            },
-        });
-    };
-    const moveToCart = (product) => {
-        addItems(product, product?.quantity);
-        removeLater(product);
-    };
-    const removeLater = (product) => {
-        const updatedLaterItems = saveLaterItems?.filter(
-            (item) => item.productId !== product.productId
-        );
-        setSaveLaterItems(updatedLaterItems);
-        localStorage.setItem("saveLater", JSON.stringify(updatedLaterItems));
-        setReload(!reload);
+        const nextCart = cartItems.filter((item) => item.productId !== product.productId);
+        const nextLater = [product, ...saveLaterItems.filter((item) => item.productId !== product.productId)];
+        persist(nextCart, nextLater).then((saved) => saved && toast.success("Product Saved To Later", { style: { top: "40px" } }));
     };
 
+    const moveToCart = (product) => {
+        const existingIndex = cartItems.findIndex((item) => item.productId === product.productId);
+        const nextCart = existingIndex >= 0
+            ? cartItems.map((item, index) => index === existingIndex ? { ...item, quantity: product.quantity } : item)
+            : [{ ...product }, ...cartItems];
+        persist(nextCart, saveLaterItems.filter((item) => item.productId !== product.productId));
+    };
+
+    const removeLater = (product) => persist(
+        cartItems,
+        saveLaterItems.filter((item) => item.productId !== product.productId)
+    );
+
+    const replaceCartItems = useCallback((items) => persist(items, saveLaterItems), [persist, saveLaterItems]);
+
     return (
-        <CartContext.Provider
-            value={[
-                cartItems,
-                setCartItems,
-                addItems,
-                removeItems,
-                saveLaterItems,
-                addLater,
-                moveToCart,
-                removeLater,
-            ]}
-        >
+        <CartContext.Provider value={[
+            cartItems,
+            replaceCartItems,
+            addItems,
+            removeItems,
+            saveLaterItems,
+            addLater,
+            moveToCart,
+            removeLater,
+        ]}>
             {children}
         </CartContext.Provider>
     );
 };
 
-//custom hook->
-const useCart = () => {
-    return useContext(CartContext);
-};
-
-// eslint-disable-next-line react-refresh/only-export-components
+const useCart = () => useContext(CartContext);
 export { CartProvider, useCart };

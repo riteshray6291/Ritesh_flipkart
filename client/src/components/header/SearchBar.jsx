@@ -1,6 +1,5 @@
 import { BsSearch } from "react-icons/bs";
-import debounce from "lodash.debounce";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { fetchCatalog } from "../../utils/productApi";
 
@@ -19,15 +18,21 @@ const SearchBar = () => {
         }
     };
 
-    // Debounce the handleSearch function with a 300ms delay
-    const debouncedSearch = debounce(handleSearch, 300);
+    const searchTimeout = useRef(null);
+
+    useEffect(() => () => clearTimeout(searchTimeout.current), []);
 
     const handleInputChange = (e) => {
         const newQuery = e.target.value;
         setQuery(newQuery);
 
-        // Call the debouncedSearch function instead of handleSearch directly
-        debouncedSearch(newQuery);
+        clearTimeout(searchTimeout.current);
+        if (!newQuery.trim()) {
+            setResults([]);
+            setOpen(false);
+            return;
+        }
+        searchTimeout.current = setTimeout(() => handleSearch(newQuery), 300);
     };
 
     //aliter- using use effect-

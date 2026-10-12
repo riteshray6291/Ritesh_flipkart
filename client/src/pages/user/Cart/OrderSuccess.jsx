@@ -16,17 +16,24 @@ const OrderSuccess = () => {
     const [loading, setLoading] = useState(true);
     const [hasSavedPayment, setHasSavedPayment] = useState(false); // Add a flag to prevent multiple API calls
 
-    // Fetch sessionId from localStorage once on mount
+    // Payment session and shipping details are kept with the signed-in account.
     useEffect(() => {
-        const storedSessionId = localStorage.getItem("sessionId");
-        setSessionId(storedSessionId);
-    }, []);
+        if (!auth?.token) return;
+        axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/user/pending-payment-session`, {
+            headers: { Authorization: auth.token },
+        }).then(({ data }) => setSessionId(data.sessionId))
+            .catch((error) => console.error("Unable to load payment session:", error));
+    }, [auth?.token]);
 
     // After order placement, remove items from cart and save details to the database
     useEffect(() => {
         const savePayment = async () => {
             try {
                 setLoading(true);
+                const shipping = await axios.get(
+                    `${import.meta.env.VITE_SERVER_URL}/api/v1/user/shipping-info`,
+                    { headers: { Authorization: auth?.token } }
+                );
                 const payment = await axios.post(
                     `${
                         import.meta.env.VITE_SERVER_URL
@@ -34,6 +41,7 @@ const OrderSuccess = () => {
                     {
                         sessionId: sessionId,
                         orderItems: cartItems,
+                        shippingInfo: shipping.data.shippingInfo,
                     },
                     {
                         headers: {
@@ -43,8 +51,6 @@ const OrderSuccess = () => {
                 );
 
                 if (payment.status === 200) {
-                    localStorage.removeItem("cart");
-                    localStorage.removeItem("sessionId");
                     setCartItems([]); // Clear cart items
                     setLoading(false);
                     setHasSavedPayment(true); // Mark the payment as saved to prevent further API calls

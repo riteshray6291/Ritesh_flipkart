@@ -1,8 +1,11 @@
 import stripe from "stripe";
-// to resolve stripe secret key error again use dotenv here
+import mongoose from "mongoose";
+import productModel from "../../models/productModel.js";
 import dotenv from "dotenv";
 dotenv.config();
-const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
+
+const isFakePaymentEnabled = () =>
+    process.env.PAYMENT_MODE === "fake" && ["development", "test"].includes(process.env.NODE_ENV);
 
 const createSession = async (req, res) => {
     try {
@@ -13,6 +16,54 @@ const createSession = async (req, res) => {
             customerPhone,
             customerName,
         } = req.body;
+        if (!Array.isArray(products) || products.length === 0) {
+            return res.status(400).send({
+                success: false,
+                message: "At least one MongoDB product is required for checkout.",
+            });
+        }
+
+        const productIds = products.map((item) => String(item?.productId || ""));
+        if (
+            productIds.some((productId) => !mongoose.isObjectIdOrHexString(productId)) ||
+            products.some(
+                (item) =>
+                    !Number.isInteger(Number(item?.quantity)) ||
+                    Number(item.quantity) < 1
+            )
+        ) {
+            return res.status(400).send({
+                success: false,
+                message: "Checkout requires valid MongoDB product IDs and quantities.",
+            });
+        }
+
+        const existingProducts = await productModel.find({ _id: { $in: productIds } });
+        if (new Set(existingProducts.map((product) => String(product._id))).size !== new Set(productIds).size) {
+            return res.status(404).send({
+                success: false,
+                message: "One or more checkout products are unavailable.",
+            });
+        }
+
+        if (isFakePaymentEnabled()) {
+            const sessionId = `fake_${new mongoose.Types.ObjectId()}`;
+            req.user.pendingPaymentSession = sessionId;
+            await req.user.save();
+            return res.send({
+                paymentMode: "fake",
+                session: { id: sessionId },
+            });
+        }
+
+        if (!process.env.STRIPE_SECRET_KEY) {
+            return res.status(503).send({
+                success: false,
+                message: "Stripe is not configured. Set STRIPE_SECRET_KEY or enable fake payments for local development.",
+            });
+        }
+        const stripeInstance = stripe(process.env.STRIPE_SECRET_KEY);
+
         // console.log(frontendURL);
         const successPath = "/shipping/confirm";
         const cancelPath = "/shipping/failed";
@@ -47,8 +98,10 @@ const createSession = async (req, res) => {
             },
         });
 
-        console.log('session: ', session);
-        res.send({ session: session });
+        req.user.pendingPaymentSession = session.id;
+        await req.user.save();
+
+        res.send({ paymentMode: "stripe", session });
     } catch (error) {
         console.log("Error in creating stripe session id: " + error);
         res.status(500).send({

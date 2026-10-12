@@ -3,12 +3,13 @@ import InputLabel from "@mui/material/InputLabel";
 import Select from "@mui/material/Select";
 import TextField from "@mui/material/TextField";
 import MenuItem from "@mui/material/MenuItem";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import states from "../../../utils/states";
 import { toast } from "react-toastify";
 import { useCart } from "../../../context/cart";
 import { useAuth } from "../../../context/auth";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 //payment using stripe
 import { loadStripe } from "@stripe/stripe-js";
@@ -16,29 +17,40 @@ import SeoData from "../../../SEO/SeoData";
 import PriceCard from "./PriceCard";
 
 const Shipping = () => {
-    const Info = localStorage.getItem("shippingInfo");
-    const shippingInfo = JSON.parse(Info);
-
     const [cartItems] = useCart();
     const { auth } = useAuth();
+    const navigate = useNavigate();
 
-    const [address, setAddress] = useState(shippingInfo?.address);
-    const [city, setCity] = useState(shippingInfo?.city);
-    const [country, setCountry] = useState("IN");
-    const [state, setState] = useState(shippingInfo?.state);
-    const [landmark, setLandmark] = useState(shippingInfo?.landmark);
-    const [pincode, setPincode] = useState(shippingInfo?.pincode);
-    const [phoneNo, setPhoneNo] = useState(shippingInfo?.phoneNo);
+    const [address, setAddress] = useState("");
+    const [city, setCity] = useState("");
+    const [country] = useState("IN");
+    const [state, setState] = useState("");
+    const [landmark, setLandmark] = useState("");
+    const [pincode, setPincode] = useState("");
+    const [phoneNo, setPhoneNo] = useState("");
+
+    useEffect(() => {
+        if (!auth?.token) return;
+        axios.get(`${import.meta.env.VITE_SERVER_URL}/api/v1/user/shipping-info`, {
+            headers: { Authorization: auth.token },
+        }).then(({ data }) => {
+            setAddress(data.shippingInfo.address || "");
+            setCity(data.shippingInfo.city || "");
+            setState(data.shippingInfo.state || "");
+            setLandmark(data.shippingInfo.landmark || "");
+            setPincode(data.shippingInfo.pincode || "");
+            setPhoneNo(data.shippingInfo.phoneNo || "");
+        }).catch((error) => toast.error(error.response?.data?.message || "Unable to load saved shipping details."));
+    }, [auth?.token]);
 
     //stripe details
     const publishKey = import.meta.env.VITE_STRIPE_PUBLISH_KEY;
-    const secretKey = import.meta.env.VITE_STRIPE_SECRET_KEY;
     let frontendURL = window.location.origin; // Get the frontend URL
 
-    const shippingSubmit = (e) => {
+    const shippingSubmit = async (e) => {
         e.preventDefault();
 
-        if (phoneNo.length < 10 || phoneNo.length > 10) {
+        if (String(phoneNo || "").length !== 10) {
             toast.error("Invalid Mobile Number");
             return;
         }
@@ -51,13 +63,20 @@ const Shipping = () => {
             pincode: pincode,
             phoneNo: phoneNo,
         };
-        localStorage.setItem("shippingInfo", JSON.stringify(data));
+        try {
+            await axios.put(
+                `${import.meta.env.VITE_SERVER_URL}/api/v1/user/shipping-info`,
+                data,
+                { headers: { Authorization: auth?.token } }
+            );
+            await handlePayment(data);
+        } catch (error) {
+            toast.error(error.response?.data?.message || error.message || "Unable to start payment.");
+        }
     };
 
     //PAYMENT USING STRIPE
-    const handlePayment = async () => {
-        const stripe = await loadStripe(publishKey);
-
+    const handlePayment = async (shippingInfo) => {
         const response = await axios.post(
             `${
                 import.meta.env.VITE_SERVER_URL
@@ -66,6 +85,8 @@ const Shipping = () => {
                 products: cartItems,
                 frontendURL: frontendURL,
                 customerEmail: auth?.user?.email,
+                customerName: auth?.user?.name,
+                customerPhone: shippingInfo.phoneNo,
             },
             {
                 headers: {
@@ -74,16 +95,20 @@ const Shipping = () => {
             }
         );
         const session = response.data.session;
-        console.log("session: ", session);
-        //storing session id to retrieve payment details after successful
-        localStorage.setItem("sessionId", session.id);
-        const result = stripe.redirectToCheckout({
+
+        if (response.data.paymentMode === "fake") {
+            navigate("/shipping/confirm");
+            return;
+        }
+
+        const stripe = await loadStripe(publishKey);
+        if (!stripe) throw new Error("Stripe could not be initialized. Check VITE_STRIPE_PUBLISH_KEY.");
+        const result = await stripe.redirectToCheckout({
             sessionId: session.id,
         });
-        console.log("result: ", result);
 
         if (result.error) {
-            console.log(result.error);
+            throw result.error;
         }
     };
 
@@ -209,7 +234,6 @@ const Shipping = () => {
 
                                 <button
                                     type="submit"
-                                    onClick={handlePayment}
                                     className="bg-orange w-full sm:w-[40%] mt-4 py-3.5 px-2 text-md font-[500] text-white shadow hover:shadow-lg rounded-sm uppercase outline-none"
                                 >
                                     make payment

@@ -3,7 +3,7 @@ import Pagination from "@mui/material/Pagination";
 import { useState, useEffect } from "react";
 import MinCategory from "../../components/MinCategory";
 import Product from "../../components/ProductListing/Product";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Spinner from "./../../components/Spinner";
 import axios from "axios";
@@ -14,6 +14,7 @@ import { fetchCatalog, fetchProductCategories } from "../../utils/productApi";
 
 const Products = () => {
     const location = useLocation();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { auth, isAdmin } = useAuth();
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
@@ -21,9 +22,9 @@ const Products = () => {
 
     const [price, setPrice] = useState([0, 200000]);
     // console.log(location.search);
-    const searchParams = new URLSearchParams(location.search);
-    const [category, setCategory] = useState(searchParams.get("category") || "");
+    const category = searchParams.get("category") || "";
     const [ratings, setRatings] = useState(0);
+    const [catalogProducts, setCatalogProducts] = useState([]);
     const [products, setProducts] = useState([]);
     const [productSource, setProductSource] = useState("");
     const [categoryOptions, setCategoryOptions] = useState([]);
@@ -40,10 +41,6 @@ const Products = () => {
     const endIndex = startIndex + productsPerPage;
     //updating the products to display on current page
     const currentProducts = products.slice(startIndex, endIndex);
-
-    useEffect(() => {
-        setCategory(new URLSearchParams(location.search).get("category") || "");
-    }, [location.search]);
 
     useEffect(() => {
         let active = true;
@@ -64,6 +61,16 @@ const Products = () => {
         setCurrentPage(page);
     };
 
+    const handleCategoryChange = (nextCategory) => {
+        const nextSearchParams = new URLSearchParams(searchParams);
+        if (nextCategory) {
+            nextSearchParams.set("category", nextCategory);
+        } else {
+            nextSearchParams.delete("category");
+        }
+        setSearchParams(nextSearchParams);
+    };
+
     useEffect(() => {
         let active = true;
         const fetchFilteredData = async () => {
@@ -71,46 +78,15 @@ const Products = () => {
                 setLoading(true);
                 setLoadError(false);
                 const catalog = await fetchCatalog({ category, query: new URLSearchParams(location.search).get("q") || "" });
-                const allProducts = catalog.products;
-                const query = new URLSearchParams(location.search)
-                    .get("q")
-                    ?.trim()
-                    .toLowerCase();
-                const filteredProducts = allProducts.filter((product) => {
-                    if (
-                        !product ||
-                        !product.id ||
-                        !product.title ||
-                        !product.image ||
-                        !product.category ||
-                        !Number.isFinite(Number(product.price))
-                    ) {
-                        return false;
-                    }
-                    const matchesPrice =
-                        Number(product.price) >= price[0] &&
-                        Number(product.price) <= price[1];
-                    const productRating = Number(product.rating?.rate) || 0;
-                    const matchesRating = productRating >= Number(ratings);
-                    const matchesQuery =
-                        !query ||
-                        `${product.title} ${product.description} ${product.category}`
-                            .toLowerCase()
-                            .includes(query);
-
-                    return (
-                        matchesPrice &&
-                        matchesRating &&
-                        matchesQuery
-                    );
-                });
+                if (!Array.isArray(catalog.products)) {
+                    throw new Error("The catalog returned an invalid product list.");
+                }
                 if (active) {
-                    setProducts(filteredProducts);
+                    setCatalogProducts(catalog.products);
                     setProductSource(catalog.source);
                     setCategoryOptions(
                         (previous) => catalog.categories || previous
                     );
-                    setProductsCount(filteredProducts.length);
                     setCurrentPage(1);
                 }
             } catch (error) {
@@ -130,7 +106,40 @@ const Products = () => {
         return () => {
             active = false;
         };
-    }, [price, category, ratings, location.search, retryCount]);
+    }, [category, location.search, retryCount]);
+
+    useEffect(() => {
+        const query = new URLSearchParams(location.search)
+            .get("q")
+            ?.trim()
+            .toLowerCase();
+        const filteredProducts = catalogProducts.filter((product) => {
+            if (
+                !product ||
+                !product.id ||
+                !product.title ||
+                !product.image ||
+                !product.category ||
+                !Number.isFinite(Number(product.price))
+            ) {
+                return false;
+            }
+
+            const productRating = Number(product.rating?.rate) || 0;
+            return (
+                Number(product.price) >= price[0] &&
+                Number(product.price) <= price[1] &&
+                productRating >= Number(ratings) &&
+                (!query ||
+                    `${product.title} ${product.description} ${product.category}`
+                        .toLowerCase()
+                        .includes(query))
+            );
+        });
+        setProducts(filteredProducts);
+        setProductsCount(filteredProducts.length);
+        setCurrentPage(1);
+    }, [catalogProducts, location.search, price, ratings]);
 
     useEffect(() => {
         // getting user wishlist items from server
@@ -175,7 +184,7 @@ const Products = () => {
                         categories={categoryOptions}
                         ratings={ratings}
                         setPrice={setPrice}
-                        setCategory={setCategory}
+                        setCategory={handleCategoryChange}
                         setRatings={setRatings}
                     />
                     {/* <!-- sidebar column  --> */}
