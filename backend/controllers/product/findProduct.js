@@ -13,7 +13,9 @@ const findProduct = async (req, res) => {
             });
         }
 
-        const response = await productModel.findById(productId);
+        const response = await productModel
+            .findById(productId)
+            .populate("seller", "name");
         if (!response) {
             return res.status(404).send({
                 success: false,
@@ -22,10 +24,14 @@ const findProduct = async (req, res) => {
             });
         }
 
+        const product = response.toObject();
+        product.sellerName = response.seller?.name || "Flipkart";
+        product.seller = response.seller?._id || response.seller;
+
         return res.status(201).send({
             success: true,
             message: "Product Fetched Successfully",
-            product: response,
+            product,
         });
     } catch (error) {
         console.log("Find Product Error: " + error);

@@ -39,51 +39,17 @@ const Cart = () => {
                                     />
                                 ))
                             )}
-                            {/* <!-- place order btn --> */}
                             <div className="flex justify-between items-center sticky bottom-0 left-0 bg-white">
-                                {/* test card details */}
-                                <div
-                                    className={`text-xs p-2 ${
-                                        cartItems.length < 1
-                                            ? "hidden"
-                                            : "inline-block"
-                                    } w-full`}
-                                >
-                                    <p>
-                                        For payment purposes, you can use the
-                                        following test card details:
-                                    </p>
-                                    <ul>
-                                        <li>
-                                            <strong>Card Number:</strong> 4242
-                                            4242 4242 4242
-                                        </li>
-                                        <li>
-                                            <strong>Expiry Date:</strong> Any
-                                            future date (e.g., 12/25)
-                                        </li>
-                                        <li>
-                                            <strong>CVV:</strong> Any 3-digit
-                                            number (e.g., 123)
-                                        </li>
-                                    </ul>
-                                </div>
-
                                 <button
                                     onClick={placeOrderHandler}
                                     disabled={
                                         cartItems.length < 1 ? true : false
                                     }
-                                    className={`${
-                                        cartItems.length < 1
-                                            ? "hidden"
-                                            : "bg-orange"
-                                    } w-full sm:w-1/3 mx-2 sm:mx-6 my-4 py-4 font-medium text-white shadow hover:shadow-lg rounded-sm `}
+                                    className={`${cartItems.length < 1 ? "hidden" : "bg-[#fb641b]"} w-full sm:w-1/3 mx-2 sm:mx-6 my-4 py-4 font-bold text-white shadow-sm transition hover:bg-[#e95a16] rounded-sm`}
                                 >
-                                    PLACE ORDER
+                                    CONTINUE TO CHECKOUT
                                 </button>
                             </div>
-                            {/* <!-- place order btn --> */}
                         </div>
                         {/* <!-- cart items container --> */}
 

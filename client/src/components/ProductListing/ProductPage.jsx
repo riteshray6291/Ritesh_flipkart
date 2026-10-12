@@ -49,6 +49,11 @@ const ProductDetails = () => {
     const { productId } = useParams();
     const [searchParams] = useSearchParams();
     const productSource = searchParams.get("source") || "";
+    const sellerName =
+        product?.sellerName ||
+        (typeof product?.seller === "string"
+            ? product.seller
+            : product?.seller?.name || product?.brand?.name || "Flipkart");
 
     const reviewSubmitHandler = () => {
         if (rating === 0 || !comment.trim()) {
@@ -749,12 +754,9 @@ const ProductDetails = () => {
                                     {/* <!-- seller details --> */}
                                     <div className="flex gap-16 mt-4 items-center text-sm font-medium">
                                         <p className="text-gray-500">Seller</p>
-                                        <Link
-                                            className="font-medium text-primaryBlue ml-3"
-                                            to="/"
-                                        >
-                                            {product?.brand?.name}
-                                        </Link>
+                                        <span className="font-medium text-primaryBlue ml-3">
+                                            {sellerName}
+                                        </span>
                                     </div>
                                     {/* <!-- seller details --> */}
 
@@ -777,6 +779,39 @@ const ProductDetails = () => {
                                         <span>{product?.description}</span>
                                     </div>
                                     {/* <!-- description details --> */}
+
+                                    <section className="w-full mt-4 rounded-sm border flex flex-col">
+                                        <h2 className="px-6 py-4 border-b text-2xl font-semibold">
+                                            Product details
+                                        </h2>
+                                        <dl className="divide-y">
+                                            {[
+                                                ["Brand", product?.brand?.name || product?.brand || "Flipkart"],
+                                                ["Category", product?.category || "General"],
+                                                ["Seller", sellerName],
+                                                [
+                                                    "Availability",
+                                                    product?.stock > 0
+                                                        ? `In stock (${product.stock} available)`
+                                                        : "Out of stock",
+                                                ],
+                                                [
+                                                    "Warranty",
+                                                    product?.warranty === 0
+                                                        ? "No warranty"
+                                                        : `${product?.warranty || 1} year brand warranty`,
+                                                ],
+                                            ].map(([label, value]) => (
+                                                <div
+                                                    className="grid grid-cols-1 gap-1 px-6 py-3 text-sm sm:grid-cols-[10rem_1fr] sm:gap-4"
+                                                    key={label}
+                                                >
+                                                    <dt className="text-gray-500">{label}</dt>
+                                                    <dd className="font-medium">{value}</dd>
+                                                </div>
+                                            ))}
+                                        </dl>
+                                    </section>
 
                                     {/* <!-- specifications border box --> */}
                                     <div className="w-full mt-4 pb-4 rounded-sm border flex flex-col">

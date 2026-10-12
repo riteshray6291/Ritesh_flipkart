@@ -4,6 +4,7 @@ import orderModel from "../../models/orderModel.js";
 import productModel from "../../models/productModel.js";
 
 const PAYMENT_METHODS = new Set(["upi", "card", "cod", "netbanking"]);
+const getPaymentResult = (order) => ["PAID", "PENDING", "paid", "pending"].includes(order.paymentStatus) ? "success" : "failure";
 
 const getShippingInfo = (shippingInfo) => {
     const requiredFields = ["address", "city", "state", "country", "pincode", "phoneNo"];
@@ -197,7 +198,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
     if (previousOrder) {
         return res.status(200).json({
             success: true,
-            paymentResult: previousOrder.paymentStatus === "PAID" ? "success" : "failure",
+            paymentResult: getPaymentResult(previousOrder),
             order: previousOrder,
         });
     }
@@ -226,7 +227,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
         } catch (error) {
             if (error.code === 11000) {
                 const existingOrder = await orderModel.findOne({ idempotencyKey, buyer: req.user._id });
-                if (existingOrder) return res.status(200).json({ success: true, paymentResult: "failure", order: existingOrder });
+                if (existingOrder) return res.status(200).json({ success: true, paymentResult: getPaymentResult(existingOrder), order: existingOrder });
             }
             throw error;
         }
@@ -245,7 +246,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
         if (error.code === 11000) {
             const existingOrder = await orderModel.findOne({ idempotencyKey, buyer: req.user._id });
             if (existingOrder) {
-                return res.status(200).json({ success: true, paymentResult: existingOrder.paymentStatus === "PAID" ? "success" : "failure", order: existingOrder });
+                return res.status(200).json({ success: true, paymentResult: getPaymentResult(existingOrder), order: existingOrder });
             }
         }
         throw error;

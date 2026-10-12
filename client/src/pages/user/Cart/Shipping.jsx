@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { FaArrowLeft, FaCheck, FaCreditCard, FaLock, FaMoneyBillWave, FaUniversity, FaWallet } from "react-icons/fa";
@@ -22,12 +22,14 @@ const Shipping = () => {
     const [cartItems, , , , , , , , clearCartAfterOrder] = useCart();
     const { auth } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const retryOrderId = searchParams.get("retry");
     const checkoutKey = useRef(getCheckoutKey());
     const [paymentMethod, setPaymentMethod] = useState("upi");
     const [paymentProvider, setPaymentProvider] = useState("Google Pay");
     const [simulatedOutcome, setSimulatedOutcome] = useState("success");
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [failedOrderId, setFailedOrderId] = useState("");
+    const [failedOrderId, setFailedOrderId] = useState(retryOrderId || "");
     const [failureMessage, setFailureMessage] = useState("");
     const [address, setAddress] = useState({ address: "", city: "", country: "IN", state: "", landmark: "", pincode: "", phoneNo: "" });
 
@@ -37,6 +39,24 @@ const Shipping = () => {
             .then(({ data }) => setAddress((current) => ({ ...current, ...data.shippingInfo })))
             .catch((error) => toast.error(error.response?.data?.message || "Unable to load your saved address."));
     }, [auth?.token]);
+
+    useEffect(() => {
+        if (!auth?.token || !retryOrderId) return;
+        axios.get(`${API_URL}/api/v1/user/orders/${retryOrderId}`, { headers: { Authorization: auth.token } })
+            .then(({ data }) => {
+                const order = data.orderDetails;
+                if (order.paymentStatus !== "FAILED" && order.paymentStatus !== "failed") {
+                    navigate("/user/orders", { replace: true });
+                    return;
+                }
+                setPaymentMethod(order.paymentMethod);
+                setFailureMessage("Retrying your previously failed demo payment. No money was charged.");
+            })
+            .catch((error) => {
+                toast.error(error.response?.data?.message || "Unable to load this order for payment retry.");
+                navigate("/user/orders", { replace: true });
+            });
+    }, [auth?.token, retryOrderId, navigate]);
 
     const subtotal = cartItems.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.quantity || 0), 0);
     const totalDiscount = cartItems.reduce((sum, item) => sum + (Number(item.price || 0) - Number(item.discountPrice || 0)) * Number(item.quantity || 0), 0);
@@ -104,7 +124,7 @@ const Shipping = () => {
                         <section className="overflow-hidden rounded-sm bg-white shadow-sm ring-1 ring-slate-200">
                             <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4"><span className="grid h-7 w-7 place-items-center rounded-full bg-[#2874f0] text-sm font-bold text-white">2</span><div><h2 className="font-bold text-slate-900">Payment method</h2><p className="text-xs text-slate-500">Choose a simulated payment option</p></div></div>
                             <div className="grid sm:grid-cols-[190px_1fr]">
-                                <div className="border-b border-slate-100 sm:border-b-0 sm:border-r">{paymentMethods.map(({ id, title, subtitle, icon: Icon }) => <button type="button" key={id} onClick={() => setPaymentMethod(id)} className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 ${paymentMethod === id ? "bg-blue-50 text-[#1558a6]" : "text-slate-700 hover:bg-slate-50"}`}><Icon className="shrink-0" aria-hidden="true" /><span className="min-w-0"><span className="block text-sm font-bold">{title}</span><span className="block truncate text-[11px] text-slate-500">{subtitle}</span></span>{paymentMethod === id && <FaCheck className="ml-auto shrink-0 text-[#2874f0]" aria-hidden="true" />}</button>)}</div>
+                                <div className="border-b border-slate-100 sm:border-b-0 sm:border-r">{paymentMethods.map(({ id, title, subtitle, icon: Icon }) => <button type="button" key={id} disabled={Boolean(retryOrderId) && id !== paymentMethod} onClick={() => setPaymentMethod(id)} className={`flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 disabled:cursor-not-allowed disabled:opacity-40 ${paymentMethod === id ? "bg-blue-50 text-[#1558a6]" : "text-slate-700 hover:bg-slate-50"}`}><Icon className="shrink-0" aria-hidden="true" /><span className="min-w-0"><span className="block text-sm font-bold">{title}</span><span className="block truncate text-[11px] text-slate-500">{subtitle}</span></span>{paymentMethod === id && <FaCheck className="ml-auto shrink-0 text-[#2874f0]" aria-hidden="true" />}</button>)}</div>
                                 <div className="min-h-48 p-5">
                                     {paymentMethod === "upi" && <><p className="text-sm font-semibold text-slate-800">Choose a demo app</p><div className="mt-3 grid grid-cols-3 gap-2">{["Google Pay", "PhonePe", "Paytm"].map((provider) => <button type="button" key={provider} onClick={() => setPaymentProvider(provider)} className={`rounded-sm border px-2 py-3 text-xs font-semibold ${paymentProvider === provider ? "border-[#2874f0] bg-blue-50 text-[#1558a6]" : "border-slate-200 text-slate-600 hover:border-slate-400"}`}>{provider}</button>)}</div><p className="mt-4 text-xs leading-5 text-slate-500">Simulation only. No UPI ID, PIN, OTP, or bank credentials are requested.</p></>}
                                     {paymentMethod === "card" && <><p className="text-sm font-semibold text-slate-800">Demo card checkout</p><p className="mt-2 text-sm text-slate-600">Use the simulation controls below. No card number, expiry, or CVV is collected or saved.</p><p className="mt-3 rounded-sm bg-slate-50 px-3 py-2 text-xs text-slate-500">Test reference: 4242 4242 4242 4242</p></>}
