@@ -1,52 +1,21 @@
-import { hashPassword, comparePassword } from "../../helper/authHelper.js";
-import userModel from "../../models/userModel.js";
+import { comparePassword, hashPassword } from "../../helper/authHelper.js";
+import asyncHandler from "express-async-handler";
 
-// POST Forgot Password
-export const forgotPasswordController = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        //Checking the EMAIL and PASSWORD
-        if (!email || !password) {
-            return res.status(401).send({
-                success: false,
-                message: "Invalid username or password",
-                errorType: "invalidCredentials",
-            });
-        }
-
-        //FINDING THE USER
-        const user = await userModel.findOne({ email });
-
-        if (!user) {
-            return res.status(401).send({
-                success: false,
-                message: "User Not Registered!",
-                errorType: "invalidUser",
-            });
-        }
-        const newPassword = await hashPassword(password);
-
-        //IF USER EXISTS-
-        const response = await userModel.findOneAndUpdate(
-            { email: email },
-            {
-                password: newPassword,
-            }
-        );
-
-        //SUCCESS RESPONSE
-        res.status(200).send({
-            success: true,
-            message: "Password Reset Successfully!",
-            response,
-        });
-    } catch (error) {
-        console.log("Forgot Password Error: " + error);
-        res.status(500).send({
-            success: false,
-            message: "Error in Forgot Password",
-            error,
-        });
+// This endpoint is an authenticated password change. Email based recovery
+// requires a verified, one-time token delivered through a configured mailer.
+export const forgotPasswordController = asyncHandler(async (req, res) => {
+    const { currentPassword, password } = req.body;
+    if (!currentPassword || !password) {
+        return res.status(400).json({ success: false, message: "Current and new passwords are required." });
     }
-};
+    if (String(password).length < 8 || Buffer.byteLength(String(password), "utf8") > 72) {
+        return res.status(400).json({ success: false, message: "New password must be at least 8 characters and no more than 72 bytes." });
+    }
+
+    const matches = await comparePassword(currentPassword, req.user.password);
+    if (!matches) return res.status(401).json({ success: false, message: "Current password is incorrect." });
+
+    req.user.password = await hashPassword(password);
+    await req.user.save();
+    return res.status(200).json({ success: true, message: "Password changed successfully." });
+});

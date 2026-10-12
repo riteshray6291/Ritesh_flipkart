@@ -66,6 +66,9 @@ const Login = () => {
             }
         } catch (error) {
             console.error("Error:", error);
+            if (error.response?.status === 401) {
+                toast.error(error.response.data?.message || "Invalid email or password.");
+            }
             // invalid password
             error.response?.status === 401 &&
                 error.response.data?.errorType === "invalidPassword" &&
@@ -109,18 +112,6 @@ const Login = () => {
                                         Recommendations
                                     </p>
 
-                                    <p className="text-xs">
-                                        <span>
-                                            User <br />
-                                        </span>
-                                        username - test@test.com <br />
-                                        password - test123 <br />
-                                        <span>
-                                            Admin <br />
-                                        </span>
-                                        username - store@flipkart.com <br />
-                                        password - admin123
-                                    </p>
                                 </div>
                                 <div className="">
                                     <img src={authImg} alt="auth image" />

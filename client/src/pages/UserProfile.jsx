@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../context/auth";
 import axios from "axios";
 import { toast } from "react-toastify";
+import Cookies from "js-cookie";
 import "react-toastify/dist/ReactToastify.css";
 
 const UserProfile = () => {
@@ -36,18 +37,12 @@ const UserProfile = () => {
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/update-details`,
                 {
                     newName: name,
-                    email: auth?.user?.email,
-                }
-            );
-            setAuth({
-                ...auth,
-                user: {
-                    ...auth.user,
-                    name: name,
                 },
-            });
-            localStorage.removeItem("auth");
-            localStorage.setItem("auth", JSON.stringify(response.data));
+                { headers: { Authorization: auth?.token } }
+            );
+            const nextAuth = { ...auth, user: response.data.user };
+            setAuth(nextAuth);
+            Cookies.set("auth", JSON.stringify(nextAuth), { expires: 7 });
 
             toast.success(response.data.message);
         } catch (error) {
@@ -64,18 +59,12 @@ const UserProfile = () => {
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/update-details`,
                 {
                     newEmail: email,
-                    email: auth?.user?.email,
-                }
-            );
-            setAuth({
-                ...auth,
-                user: {
-                    ...auth.user,
-                    email: email,
                 },
-            });
-            localStorage.removeItem("auth");
-            localStorage.setItem("auth", JSON.stringify(response.data));
+                { headers: { Authorization: auth?.token } }
+            );
+            const nextAuth = { ...auth, user: response.data.user };
+            setAuth(nextAuth);
+            Cookies.set("auth", JSON.stringify(nextAuth), { expires: 7 });
 
             toast.success(response.data.message);
         } catch (error) {
@@ -93,18 +82,12 @@ const UserProfile = () => {
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/update-details`,
                 {
                     newPhone: phone,
-                    email: auth?.user?.email,
-                }
-            );
-            setAuth({
-                ...auth,
-                user: {
-                    ...auth.user,
-                    phone: phone,
                 },
-            });
-            localStorage.removeItem("auth");
-            localStorage.setItem("auth", JSON.stringify(response.data));
+                { headers: { Authorization: auth?.token } }
+            );
+            const nextAuth = { ...auth, user: response.data.user };
+            setAuth(nextAuth);
+            Cookies.set("auth", JSON.stringify(nextAuth), { expires: 7 });
 
             toast.success(response.data.message);
         } catch (error) {

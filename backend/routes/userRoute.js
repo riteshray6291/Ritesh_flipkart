@@ -43,5 +43,5 @@ router.get("/admin-order-detail", isAdmin, getOrderDetail);
 router.patch("/update/order-status", isAdmin, updateOrder);
 
 //get all order and delete if possible
-router.get("/get-all-order", requireSignIn, getAllUserOrder);
+router.get("/get-all-order", isAdmin, getAllUserOrder);
 export default router;

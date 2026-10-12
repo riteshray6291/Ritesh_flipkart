@@ -11,22 +11,12 @@ This is a Flipkart clone eCommerce project developed using the MERN (MongoDB, Ex
 - [Contributing](#contributing)
 - [Environment Variables](#environment-variables)
 
-## Test Users
-
-- **USER**
-  - Email: test@test.com
-  - Password: test123
-
-- **ADMIN**
-  - Email: store@flipkart.com
-  - Password: admin123
-
 ## Features
 
 - **User Authentication and Authorization:** Implemented user registration, login, and JWT-based authorization for secure access to user-specific data.
 - **Product Catalog:** Display products with categories and provide a search functionality for users to find products easily.
 - **Shopping Cart Management:** Allow users to add and remove products from their shopping carts, view cart contents, save later, and proceed to checkout.
-- **Secure Payment Processing (Stripe Integration):** Implement Stripe payment gateway for secure and convenient online payments. Users can complete purchases using credit/debit cards.
+- **Checkout:** Cash on Delivery is supported. Local demo payment outcomes are available only in development and test environments.
 - **User Order History and Order Management:** Store user order history and provide a user-friendly interface for order management, including order status and tracking.
 - **Admin Panel for Product Management:** Admin users can manage product listings, categories, and view orders. Accessible via `/dashboard/admin` route (login required).
 - **Responsive Design with Tailwind CSS and Material UI:** Utilize Tailwind CSS and Material UI for responsive and visually appealing user interfaces on both mobile and desktop devices.
@@ -39,8 +29,8 @@ Before you begin, ensure you have met the following requirements:
 
 - Node.js and npm installed
 - MongoDB instance (local or remote)
-- Stripe API key (for payment processing)
-- Cloudinary account and API credentials
+- MongoDB instance (local or hosted)
+- Cloudinary credentials for product image uploads
 
 ## Setup
 
@@ -55,14 +45,14 @@ Before you begin, ensure you have met the following requirements:
      ```sh
      cd backend
      ```
-   - Create a `.env` file and add your environment variables (see the example below).
+   - Copy `.env.example` to `.env` and set `MONGODB_URI` to your database connection string. `JWT_SECRET` must be a private random value; use at least 32 random bytes in production.
    - Install the dependencies:
      ```sh
      npm install
      ```
    - Start the backend server:
      ```sh
-     npm run dev
+     npm start
      ```
 
 3. **Setup the Frontend:**
@@ -81,8 +71,7 @@ Before you begin, ensure you have met the following requirements:
      ```
 
 4. **Access the Application:**
-   - Visit `http://localhost:5173` in your browser to access the Flipkart clone.
-   - You can access the admin panel at `http://localhost:5173/dashboard/admin` (login required).
+   - Visit `http://localhost:5173` in your browser. Use `npm run dev` in the backend directory to start both apps during development.
 
 ## Environment Variables
 
@@ -96,7 +85,6 @@ JWT_SECRET=RANDOM_STRING
 CLOUD_NAME=CLOUDINARY_CLOUD_NAME
 CLOUD_API_KEY=CLOUDINARY_API_KEY
 CLOUD_SECRET=CLOUDINARY_SECRET_KEY
-STRIPE_SECRET_KEY=YOUR_STRIPE_SECRET_KEY
 FLIPKART_AFFILIATE_ID=YOUR_FLIPKART_AFFILIATE_TRACKING_ID
 FLIPKART_AFFILIATE_TOKEN=YOUR_FLIPKART_AFFILIATE_API_TOKEN
 ```
@@ -105,12 +93,15 @@ FLIPKART_AFFILIATE_TOKEN=YOUR_FLIPKART_AFFILIATE_API_TOKEN
 
 ```plaintext
 VITE_API=http://localhost:8080
-VITE_STRIPE_PUBLISH_KEY=YOUR_STRIPE_PUBLISH_KEY
-VITE_SERVER_URL=SERVER_BASE_URL_WITHOUT_TRAILING_SLASH (in case you want deployed server url- https://e-commerce-mgtd.onrender.com without any / at end)
+VITE_SERVER_URL=http://localhost:8080
 VITE_DEMO_API_URL=https://fakestoreapi.com
 ```
 
-For local development, `VITE_SERVER_URL` can be `http://localhost:8080` (the frontend also accepts the older `VITE_API` name). When the frontend is deployed on a different origin, set `CORS_ORIGINS` in `backend/.env` to its full origin, such as `https://shop.example.com`. Multiple origins can be comma-separated. Restart both servers after changing environment values.
+For MongoDB Atlas, create a database user, allow the backend host in Atlas Network Access, and use the generated `mongodb+srv://` URI as `MONGODB_URI`. URL-encode special characters in the username or password. Keep `.env` files out of source control and never put database credentials in `client/.env`.
+
+For production, set `NODE_ENV=production`, use a 32-byte-or-longer random `JWT_SECRET`, set `CORS_ORIGINS` to the exact HTTPS frontend origin(s), and set `VITE_SERVER_URL` to the HTTPS API origin before building the client. The API exposes `/health` for deployment health checks and refuses to start with weak auth configuration or fake payment mode. Public registration creates customer accounts only; grant administrator access through a trusted operations process.
+
+Production checkout currently supports Cash on Delivery. The card, UPI, and netbanking selections in development are simulations and are deliberately unavailable in production. A real online payment provider and verified webhook flow must be integrated before accepting online payments.
 
 ### Flipkart Affiliate product catalog
 
@@ -130,9 +121,9 @@ Do not add Affiliate credentials to `client/.env` or commit `backend/.env`. The 
 Contributions are welcome! Feel free to open issues or submit pull requests to improve this project.
 # Ritesh_flipkart
 
-## Local fake payments
+## Local demo payments
 
-Checkout offers Stripe card payment and Cash on Delivery. Cash on Delivery places the order immediately, reserves current MongoDB stock, and records payment as due on delivery. Card payments use Stripe Checkout.
+Cash on Delivery places the order and records payment as due on delivery. Simulated payment outcomes never contact a payment provider and must not be used for real transactions.
 
 For local development without Stripe credentials, set both environment values:
 
@@ -145,4 +136,4 @@ PAYMENT_MODE=fake
 VITE_PAYMENT_MODE=fake
 ```
 
-Restart the backend and Vite after changing environment files. Fake payments are accepted only when `NODE_ENV` is `development` or `test`; they create a local order and reduce stock using current MongoDB product data. They do not contact Stripe or move real money. Leave `PAYMENT_MODE=stripe` for Stripe Checkout.
+Restart the backend and Vite after changing environment files. Fake payment outcomes are accepted only when `PAYMENT_MODE=fake` and `NODE_ENV` is `development` or `test`; they create local orders and adjust stock using MongoDB data. They do not contact a payment provider or move real money.

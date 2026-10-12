@@ -1,32 +1,12 @@
-import userModel from "../../models/userModel.js";
-//account Deactivate
-export const deactivateController = async (req, res) => {
-    try {
-        const { email, phone } = req.body;
-        const user = await userModel.findOne({ email });
-        if (!user) {
-            return res.status(401).send({
-                success: false,
-                message: "User Not Found!",
-                errorType: "invalidUser",
-            });
-        }
-        phone === user.phone && (await userModel.deleteOne({ email: email }))
-            ? res.status(200).send({
-                  success: true,
-                  message: "Account Deleted Successfully!",
-              })
-            : res.status(401).send({
-                  success: true,
-                  message: "Mobile Number does not match!",
-                  errorType: "phoneMismatch",
-              });
-    } catch (error) {
-        console.log("Deactivation Error: " + error);
-        res.status(500).send({
-            success: false,
-            message: "Error in Deactivating Account",
-            error,
-        });
+import { comparePassword } from "../../helper/authHelper.js";
+import asyncHandler from "express-async-handler";
+
+export const deactivateController = asyncHandler(async (req, res) => {
+    const { currentPassword } = req.body;
+    if (!currentPassword) return res.status(400).json({ success: false, message: "Confirm your password to deactivate the account." });
+    if (!(await comparePassword(currentPassword, req.user.password))) {
+        return res.status(401).json({ success: false, message: "Password is incorrect." });
     }
-};
+    await req.user.deleteOne();
+    return res.status(200).json({ success: true, message: "Account deactivated successfully." });
+});

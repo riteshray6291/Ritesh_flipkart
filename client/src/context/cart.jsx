@@ -145,7 +145,7 @@ const CartProvider = ({ children }) => {
     );
 
     const replaceCartItems = useCallback((items) => persist(items, saveLaterItems), [persist, saveLaterItems]);
-    const clearCartAfterOrder = useCallback(() => setCartItems([]), []);
+    const clearCartAfterOrder = useCallback((items = []) => setCartItems(items), []);
 
     return (
         <CartContext.Provider value={[

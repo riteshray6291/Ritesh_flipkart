@@ -16,6 +16,7 @@ const productSchema = new mongoose.Schema({
             required: true,
         },
     ],
+
     specifications: [
         {
             title: {

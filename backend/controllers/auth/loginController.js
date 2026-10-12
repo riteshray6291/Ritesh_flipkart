@@ -6,6 +6,7 @@ import JWT from "jsonwebtoken";
 export const loginController = async (req, res) => {
     try {
         const { email, password } = req.body;
+        const normalizedEmail = String(email || "").trim().toLowerCase();
 
         //Checking the EMAIL and PASSWORD
         if (!email || !password) {
@@ -17,13 +18,12 @@ export const loginController = async (req, res) => {
         }
 
         //FINDING THE USER
-        const user = await userModel.findOne({ email });
+        const user = await userModel.findOne({ email: normalizedEmail }).select("+password");
 
         if (!user) {
             return res.status(401).send({
                 success: false,
-                message: "User Not Registered!",
-                errorType: "invalidUser",
+                message: "Invalid email or password.",
             });
         }
 
@@ -32,8 +32,7 @@ export const loginController = async (req, res) => {
         if (!match) {
             return res.status(401).send({
                 success: false,
-                message: "Invalid Password!",
-                errorType: "invalidPassword",
+                message: "Invalid email or password.",
             });
         }
 
@@ -63,7 +62,6 @@ export const loginController = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error in Login",
-            error,
         });
     }
 };

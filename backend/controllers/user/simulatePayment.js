@@ -128,6 +128,11 @@ const getTotals = (products) => {
 };
 
 const simulatePayment = asyncHandler(async (req, res) => {
+    const isCod = req.body.paymentMethod === "cod";
+    const demoPaymentsEnabled = process.env.PAYMENT_MODE === "fake" && ["development", "test"].includes(process.env.NODE_ENV);
+    if (!isCod && !demoPaymentsEnabled) {
+        return res.status(404).json({ success: false, message: "Demo payments are unavailable." });
+    }
     const { paymentMethod, outcome, idempotencyKey, orderId } = req.body;
     if (!PAYMENT_METHODS.has(paymentMethod)) {
         return res.status(400).json({ success: false, message: "Choose a valid demo payment method." });
@@ -148,7 +153,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
         if (order.paymentStatus === "PAID" || order.paymentStatus === "paid") {
             clearPurchasedItems(req.user, order.products);
             await req.user.save();
-            return res.status(200).json({ success: true, paymentResult: "success", order });
+            return res.status(200).json({ success: true, paymentResult: "success", order, cartItems: req.user.cart });
         }
         if (order.paymentStatus !== "FAILED" && order.paymentStatus !== "failed") {
             return res.status(400).json({ success: false, message: "This order is not eligible for payment retry." });
@@ -184,7 +189,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
             paymentSaved = true;
             clearPurchasedItems(req.user, lockedOrder.products);
             await req.user.save();
-            return res.status(200).json({ success: true, paymentResult: "success", order: lockedOrder });
+            return res.status(200).json({ success: true, paymentResult: "success", order: lockedOrder, cartItems: req.user.cart });
         } catch (error) {
             if (!paymentSaved) {
                 await restoreStock(adjustments);
@@ -200,6 +205,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
             success: true,
             paymentResult: getPaymentResult(previousOrder),
             order: previousOrder,
+            cartItems: req.user.cart,
         });
     }
 
@@ -252,7 +258,7 @@ const simulatePayment = asyncHandler(async (req, res) => {
         throw error;
     }
 
-    return res.status(201).json({ success: true, paymentResult: "success", order });
+    return res.status(201).json({ success: true, paymentResult: "success", order, cartItems: req.user.cart });
 });
 
 export default simulatePayment;

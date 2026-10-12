@@ -7,19 +7,16 @@ import ScrollToTopOnRouteChange from "../../utils/ScrollToTopOnRouteChange";
 
 const Deactivate = () => {
     const navigate = useNavigate();
-    const [email, setEmail] = useState("");
-    const [phone, setPhone] = useState("");
-    const { auth, setAuth, LogOut } = useAuth();
+    const [currentPassword, setCurrentPassword] = useState("");
+    const { auth, LogOut } = useAuth();
 
     const handleDeactivate = async (e) => {
         e.preventDefault();
         try {
             const response = await axios.post(
                 `${import.meta.env.VITE_SERVER_URL}/api/v1/auth/deactivate`,
-                {
-                    email,
-                    phone,
-                }
+                { currentPassword },
+                { headers: { Authorization: auth?.token } }
             );
             // console.log(response);
 
@@ -30,9 +27,7 @@ const Deactivate = () => {
             }
         } catch (error) {
             console.log(error);
-            error.response?.status === 401 &&
-                error.response.data?.errorType === "phoneMismatch" &&
-                toast.error(error.response.data.message);
+            toast.error(error.response?.data?.message || "Unable to deactivate your account.");
         }
     };
     return (
@@ -84,21 +79,12 @@ const Deactivate = () => {
                             className="flex flex-col gap-4 items-center w-full"
                         >
                             <input
-                                type="email"
-                                onChange={(e) => setEmail(e.target.value)}
-                                placeholder="Confirm Your Email Address"
+                                type="password"
+                                autoComplete="current-password"
+                                required
+                                onChange={(e) => setCurrentPassword(e.target.value)}
                                 className="border-2 p-2 w-[220px] focus:outline-primaryBlue focus:outline-1"
-                                pattern="[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}$" // Email pattern
-                            />
-                            <input
-                                type="tel"
-                                onChange={(e) => setPhone(e.target.value)}
-                                className="border-2 p-2 w-[220px] focus:outline-primaryBlue focus:outline-1"
-                                inputMode="numeric" // Set input mode to numeric
-                                pattern="[0-9]*" // Allow only numeric values
-                                minLength="10"
-                                maxLength="10"
-                                placeholder="Confirm Your Mobile Number"
+                                placeholder="Confirm your password"
                             />
 
                             <div className="relative flex items-center">

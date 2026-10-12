@@ -5,8 +5,11 @@ const getAllUserOrder = async (req, res) => {
     try {
         const order = await orderModel
             .find({})
-            .populate({ path: "buyer", model: userModel })
-            .populate({ path: "products.seller", model: userModel });
+            .select("buyer products shippingInfo amount subtotal discount deliveryCharge paymentMethod paymentStatus orderStatus createdAt")
+            .sort({ createdAt: -1 })
+            .limit(100)
+            .populate({ path: "buyer", model: userModel, select: "name email phone" })
+            .populate({ path: "products.seller", model: userModel, select: "name" });
 
         res.status(200).send({
             success: true,

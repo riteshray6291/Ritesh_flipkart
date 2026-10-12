@@ -3,57 +3,57 @@ import asyncHandler from "express-async-handler";
 import UserModel from "../models/userModel.js";
 
 const requireSignIn = asyncHandler(async (req, res, next) => {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ success: false, message: "Authentication required." });
+    if (!process.env.JWT_SECRET) return res.status(503).json({ success: false, message: "Authentication is not configured." });
+
+    let decoded;
     try {
-        const token = req.headers.authorization;
-
-        if (!token) {
-            return res.status(401).json({ message: "JWT must be provided" });
-        }
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-        // Attach user information to the request
-        req.user = await UserModel.findById(decoded._id);
-
-        if (!req.user || req.user.role !== 0) {
-            return res.status(401).json({ message: "Unauthorised User" });
-        }
-
-        next();
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Server error" });
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+        return res.status(401).json({ success: false, message: "Invalid or expired session." });
     }
+
+    req.user = await UserModel.findById(decoded._id);
+    if (!req.user || req.user.role !== 0) {
+        return res.status(401).json({ success: false, message: "Unauthorised User" });
+    }
+    next();
+});
+
+const requireAuthenticated = asyncHandler(async (req, res, next) => {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ success: false, message: "Authentication required." });
+    if (!process.env.JWT_SECRET) return res.status(503).json({ success: false, message: "Authentication is not configured." });
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = await UserModel.findById(decoded._id).select("+password");
+    } catch {
+        return res.status(401).json({ success: false, message: "Invalid or expired session." });
+    }
+    if (!req.user) return res.status(401).json({ success: false, message: "Invalid or expired session." });
+    next();
 });
 
 const isAdmin = asyncHandler(async (req, res, next) => {
+    const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ success: false, message: "Authentication required." });
+    if (!process.env.JWT_SECRET) return res.status(503).json({ success: false, message: "Authentication is not configured." });
+
+    let decoded;
     try {
-        const token = req.headers.authorization;
-
-        if (!token) {
-            return res.status(401).json({ message: "JWT must be provided" });
-        }
-
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        // console.log(decoded);
-
-        // Attach user information to the request
-        req.user = await UserModel.findById(decoded._id);
-        // console.log(req.user);
-        if (!req.user || req.user.role !== 1) {
-            return res
-                .status(403)
-                .json({ message: "Access denied. Admin privileges required." });
-        }
-
-        next();
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Server error" });
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+        return res.status(401).json({ success: false, message: "Invalid or expired session." });
     }
+    req.user = await UserModel.findById(decoded._id);
+    if (!req.user || req.user.role !== 1) {
+        return res.status(403).json({ success: false, message: "Access denied. Admin privileges required." });
+    }
+    next();
 });
 
-export { requireSignIn, isAdmin };
+export { requireSignIn, requireAuthenticated, isAdmin };
 // import JWT from "jsonwebtoken";
 // import userModel from "../models/userModel.js";
 // import asyncHandler from "express-async-handler";

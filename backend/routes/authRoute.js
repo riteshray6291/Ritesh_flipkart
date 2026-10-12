@@ -1,11 +1,10 @@
 import express from "express";
 import { registerController } from "../controllers/auth/registerController.js";
 import { loginController } from "../controllers/auth/loginController.js";
-import { userCheckController } from "../controllers/auth/userExist.js";
 import { forgotPasswordController } from "../controllers/auth/forgotPassword.js";
 import { updateDetailsController } from "../controllers/auth/updateDetails.js";
 import { deactivateController } from "../controllers/auth/deactivateAccount.js";
-import { isAdmin, requireSignIn } from "../middleware/authMiddleware.js";
+import { isAdmin, requireAuthenticated, requireSignIn } from "../middleware/authMiddleware.js";
 
 //router object
 const router = express.Router();
@@ -18,10 +17,9 @@ router.post("/register", registerController);
 router.post("/login", loginController);
 
 //USER EXIST || METHOD POST
-router.post("/user-exist", userCheckController);
 
 // FORGOT PASSWORD ROUTE
-router.post("/forgot-password", forgotPasswordController);
+router.post("/forgot-password", requireAuthenticated, forgotPasswordController);
 
 //protected route-user
 router.get("/user-auth", requireSignIn, (req, res) => {
@@ -42,9 +40,9 @@ router.get("/admin-auth", isAdmin, (req, res) => {
 });
 
 // update details POST route\
-router.post("/update-details", updateDetailsController);
+router.post("/update-details", requireAuthenticated, updateDetailsController);
 
 // deactivate account
-router.post("/deactivate", deactivateController);
+router.post("/deactivate", requireAuthenticated, deactivateController);
 
 export default router;

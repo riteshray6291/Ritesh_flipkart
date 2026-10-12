@@ -1,61 +1,31 @@
 import userModel from "../../models/userModel.js";
+import asyncHandler from "express-async-handler";
 
-// Update Details controller
-export const updateDetailsController = async (req, res) => {
-    try {
-        const { newName, newEmail, newPhone, email } = req.body;
-        const user = await userModel.findOne({ email });
-        if (!user) {
-            return res.status(401).send({
-                success: false,
-                message: "User Not Found!",
-                errorType: "invalidUser",
-            });
-        }
-        if (newName) {
-            const response = await userModel.findOneAndUpdate(
-                { email: email },
-                {
-                    name: newName,
-                }
-            );
-            res.status(200).send({
-                success: true,
-                message: "Name Updated Successfully!",
-            });
-        }
-        if (newEmail) {
-            const response = await userModel.findOneAndUpdate(
-                { email: email },
-                {
-                    email: newEmail,
-                }
-            );
-            res.status(200).send({
-                success: true,
-                message: "Email Updated Successfully!",
-            });
-        }
-        if (newPhone) {
-            const response = await userModel.findOneAndUpdate(
-                { email: email },
-                {
-                    phone: newPhone,
-                }
-            );
-            res.status(200).send({
-                success: true,
-                message: "Mobile Number Updated Successfully!",
-            });
-        }
-
-        //SUCCESS RESPONSE
-    } catch (error) {
-        console.log("Update Details Error: " + error);
-        res.status(500).send({
-            success: false,
-            message: "Error in Updating Details",
-            error,
-        });
+export const updateDetailsController = asyncHandler(async (req, res) => {
+    const { newName, newEmail, newPhone } = req.body;
+    if (!newName && !newEmail && !newPhone) {
+        return res.status(400).json({ success: false, message: "No profile changes were provided." });
     }
-};
+    if (newName) req.user.name = String(newName).trim();
+    if (newEmail) {
+        const email = String(newEmail).trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ success: false, message: "Enter a valid email address." });
+        }
+        const existing = await userModel.exists({ email, _id: { $ne: req.user._id } });
+        if (existing) return res.status(409).json({ success: false, message: "Email address is already in use." });
+        req.user.email = email;
+    }
+    if (newPhone) {
+        if (!/^\+?[\d\s()-]{7,20}$/.test(String(newPhone))) {
+            return res.status(400).json({ success: false, message: "Enter a valid phone number." });
+        }
+        req.user.phone = String(newPhone).trim();
+    }
+    await req.user.save();
+    return res.status(200).json({
+        success: true,
+        message: "Profile updated successfully.",
+        user: { _id: req.user._id, name: req.user.name, email: req.user.email, phone: req.user.phone, address: req.user.address, role: req.user.role },
+    });
+});
