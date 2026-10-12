@@ -137,3 +137,5 @@ VITE_PAYMENT_MODE=fake
 ```
 
 Restart the backend and Vite after changing environment files. Fake payment outcomes are accepted only when `PAYMENT_MODE=fake` and `NODE_ENV` is `development` or `test`; they create local orders and adjust stock using MongoDB data. They do not contact a payment provider or move real money.
+
+# flipkart
